@@ -78,15 +78,13 @@ class SpoilerblockPreprocessor(markdown.preprocessors.Preprocessor):
                 pretag, desc, content, posttag = match.groups()
                 desc = desc[1:] if desc else "Spoiler"
 
-                # This isn't great: recursively render content, markdown -> html
-                # content = self.md.convert(content)
-                # Unfortunately we can't do this at the block level.
-
                 pre_html = TEMPLATE_PRE.render(desc=desc, content=content)
                 post_html = TEMPLATE_POST.render(desc=desc, content=content)
                 if not inserted_script:
                     pre_html = SCRIPT_PREREQ + pre_html
                     inserted_script = True
+
+                # These HTML blocks get shelved so that the inner content gets rendered as usual.
 
                 pre_html = self.md.htmlStash.store(pre_html)
                 post_html = self.md.htmlStash.store(post_html)
