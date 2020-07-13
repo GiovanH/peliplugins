@@ -61,7 +61,7 @@ class PelicanTweetEmbedMdExtension(markdown.Extension):
         # Matches link tweets in the form of [!Tweet](https://twitter.com/gio_ebooks/status/1250287970134810624)
         tweetembedPattern = PelicanTweetEmbedInlineProcessor(TWEETEMBED_RE)
         # tweetembedPattern.md = md
-        md.inlinePatterns.register(tweetembedPattern, 'tweetembed2', 1000)  # Priority must exceed link
+        md.inlinePatterns.register(tweetembedPattern, 'tweetembed2', 200)  # Priority must exceed link
 
 
 def getTweetJson(tweet_id):
