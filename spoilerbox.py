@@ -2,6 +2,7 @@
 import markdown
 from jinja2 import Template
 import re
+import logging
 
 # from pelican import generators
 from pelican import signals
@@ -72,15 +73,20 @@ class SpoilerblockPreprocessor(markdown.preprocessors.Preprocessor):
         while True:
             match = RE.search(text)
             if match:
+
                 before = text[:match.start()]
                 after = text[match.end():]
 
                 pretag, desc, content, posttag = match.groups()
                 desc = desc[1:] if desc else "Spoiler"
+                
+                logging.info("Found spoiler wrapped content")
+                logging.info(content)
 
                 pre_html = TEMPLATE_PRE.render(desc=desc, content=content)
                 post_html = TEMPLATE_POST.render(desc=desc, content=content)
                 if not inserted_script:
+                    logging.info("Inserting script for first spoilerbox")
                     pre_html = SCRIPT_PREREQ + pre_html
                     inserted_script = True
 

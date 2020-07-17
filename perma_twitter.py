@@ -72,7 +72,7 @@ def getTweetJson(tweet_id):
             json_obj = json.load(fp)
             logging.info("Found saved tweet data for " + tweet_id)
             return json_obj
-    except Exception:
+    except FileNotFoundError:
         # No file yet
         logging.error("Not seeing cached tweet for id " + tweet_id, exc_info=1)
 
