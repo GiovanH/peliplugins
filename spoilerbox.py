@@ -7,22 +7,6 @@ import logging
 # from pelican import generators
 from pelican import signals
 
-"""
-Suggested CSS would be something like:
-
-    /* Spoiler tags */
-    button.spoiler-button {
-        margin-left: auto;
-        margin-right: auto;
-        display: block;
-    }
-
-    .spoiler-wrapper {
-        border: dashed gray 1px;
-        margin: 32px 0px;
-        padding: 1px 35px;
-    }
-"""
 
 MATCH_RE = r"(\[spoiler( .+?){0,1}\])([\S\s]*?)(\[\/spoiler\])"
 

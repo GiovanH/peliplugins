@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 from pelican import signals
 from pelican.generators import ArticlesGenerator, PagesGenerator
 
+RENDERDEPS_USE_SOUP_DEFAULT = False
+
 def process_content(article):
     """
     Pelican callback
@@ -16,21 +18,27 @@ def process_content(article):
 
     settings = article.settings
     dependencies = settings.get("RENDER_DEPS", [])
+    use_soup = settings.get("RENDERDEPS_USE_SOUP", RENDERDEPS_USE_SOUP_DEFAULT)
     soup = BeautifulSoup(article._content, 'html.parser')
 
     dirty = False
-    
+
     for (args, kwargs), dep in dependencies:
         logging.debug(f"Checking for '{args} {kwargs}'")
         if soup.find(*args, **kwargs):
-            soup.append(BeautifulSoup(dep, 'html.parser'))
-            dirty = True
             logging.info("Inserting dependency " + repr(dep))
+            if use_soup:
+                soup.append(BeautifulSoup(dep, 'html.parser'))
+                dirty = True
+            else:
+                article._content += dep
+                # just chuck it in
+                # this is actually *better* for stashed HTML?
         else:
             logging.debug("Not found")
 
     if dirty:
-        article._content = soup.decode()
+        article._content = soup.prettify()
 
     return
 
