@@ -86,26 +86,6 @@ It is refactored for ease of use and efficiency, and has some additional tweaks 
 
 - Does not include the content of `<script>` tags, even on template pages
 
-## Spoilerbox
-
-Markdown only.
-
-## Wordcount
-
-Estimates the word count and reading time of articles.
-
-Appends the following attributes to each article:
-
-- `word_count`, which is rounded to the nearest 10 words
-- `instance.est_read_time`, the estimated read time in minutes
-- `instance.word_count_wpm`, which is the WPM used in the read time calculation.
-
-These attributes are readable by Jinja and can be used in templates.
-
-### Configuration
-
-`WORDCOUNT_WPM` defines the reading speed used for read time calculations. This defaults to `200`.
-
 ## Spoiler box
 
 Markdown only.
@@ -159,3 +139,19 @@ button.spoiler-button {
     padding: 1px 35px;
 }
 ```
+
+## Wordcount
+
+Estimates the word count and reading time of articles.
+
+Appends the following attributes to each article:
+
+- `word_count`, which is rounded to the nearest 10 words
+- `instance.est_read_time`, the estimated read time in minutes
+- `instance.word_count_wpm`, which is the WPM used in the read time calculation.
+
+These attributes are readable by Jinja and can be used in templates.
+
+### Configuration
+
+`WORDCOUNT_WPM` defines the reading speed used for read time calculations. This defaults to `200`.
