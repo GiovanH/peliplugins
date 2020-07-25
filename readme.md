@@ -11,6 +11,8 @@ WIP support for [Markdeep](https://casual-effects.com/markdeep/) documents.
 Just put markdeep files in your content directory like you would markdown documents. 
 Supported extensions for markdeep are `.mdhtml` and `.md.html`, although the second one will not work with pelican until they implement [#2780](https://github.com/getpelican/pelican/issues/2780). **Do** ***not*** **include the markdeep footer!**
 
+There are some cases where Markdeep documents do not render correctly due to bugs in Markdeep itself. These issues have been reported and may be fixed in the future.
+
 ## Perma twitter
 
 Markdown only.
