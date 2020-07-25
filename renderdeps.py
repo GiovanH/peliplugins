@@ -51,8 +51,22 @@ def add_deps(generators):
                 process_content(article)
             for article in generator.drafts:
                 process_content(article)
+            for article in generator.translations:
+                process_content(article)
+            for article in generator.drafts_translations:
+                process_content(article)
         elif isinstance(generator, PagesGenerator):
             for page in generator.pages:
+                process_content(page)
+            for page in generator.hidden_pages:
+                process_content(page)
+            for page in generator.draft_pages:
+                process_content(page)
+            for page in generator.translations:
+                process_content(page)
+            for page in generator.hidden_translations:
+                process_content(page)
+            for page in generator.draft_translations:
                 process_content(page)
 
 
