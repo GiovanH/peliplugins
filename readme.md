@@ -104,3 +104,13 @@ These attributes are readable by Jinja and can be used in templates.
 ### Configuration
 
 `WORDCOUNT_WPM` defines the reading speed used for read time calculations. This defaults to `200`.
+
+## Anchorlinks
+
+Anchorlinks is an extremely simple plugin that simply adds the class `.anchorlink` to any anchorlinks (i.e. jumplinks, links to anchors on the page) in the HTML document.
+
+The only configuration is an optional 
+
+Anchorlinks is designed to be used with additional CSS styling to differentiate the anchorlinks from other links.
+
+Anchorlinks will ignore all links with tags in `ANCHORLINKS_IGNORE`, which is `["footnote-ref", "toclink"]` by default.
