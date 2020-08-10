@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from pelican import signals
 from pelican.generators import ArticlesGenerator, PagesGenerator
 
-RENDERDEPS_USE_SOUP_DEFAULT = False
+RENDERDEPS_USE_SOUP_DEFAULT = True
 
 def process_content(article):
     """
@@ -33,7 +33,6 @@ def process_content(article):
             else:
                 article._content += dep
                 # just chuck it in
-                # this is actually *better* for stashed HTML?
         else:
             logging.debug("Not found")
 
