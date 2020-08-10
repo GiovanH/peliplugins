@@ -2,18 +2,7 @@
 
 import logging
 import bs4
-import re
 from pelican import signals
-
-def add_class(node, name):
-    """
-    Add class value to a given tag
-
-    :param node:    HTML tag
-    :param name:    class attribute value to add
-    """
-    node['class'] = node.get('class', []) + [name, ]
-
 
 def content_object_init(instance):
     """
