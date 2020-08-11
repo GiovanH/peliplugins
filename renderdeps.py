@@ -37,7 +37,7 @@ def process_content(article):
             logging.debug("Not found")
 
     if dirty:
-        article._content = soup.prettify()
+        article._content = str(soup)
 
     return
 
