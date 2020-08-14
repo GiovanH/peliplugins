@@ -1,9 +1,9 @@
 # -*- coding: utf8 -*-
 from markdown.extensions import Extension
-import markdown.inlinepatterns as inlinepatterns
-from markdown.inlinepatterns import LinkInlineProcessor
+# import markdown.inlinepatterns as inlinepatterns
+# from markdown.inlinepatterns import LinkInlineProcessor
 from markdown.inlinepatterns import ImageInlineProcessor
-import xml.etree.ElementTree as etree
+# import xml.etree.ElementTree as etree
 from pelican import signals
 import logging
 
