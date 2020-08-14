@@ -114,3 +114,13 @@ The only configuration is an optional
 Anchorlinks is designed to be used with additional CSS styling to differentiate the anchorlinks from other links.
 
 Anchorlinks will ignore all links with tags in `ANCHORLINKS_IGNORE`, which is `["footnote-ref", "toclink"]` by default.
+
+## Autoattach
+
+Markdown only.
+
+Automatically attaches dot-slash resources (`![](./img.png)`) using native pelican attaching.
+
+This only effects links beginning with `./`.
+
+There are no options to configure.
