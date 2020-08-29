@@ -35,9 +35,9 @@ TWEEPY_ACCESS_TOKEN_SECRET = ""
 
 ### Usage
 
-Embed tweets as links with the label "!tweet" (case insensitive) like so:
+Embed tweets as images with any label, but a twitter link instead of an image source.
 
-`[!Tweet](https://twitter.com/dril/status/1283532184985329664?s=20)`
+`![dril tweet](https://twitter.com/dril/status/1283532184985329664?s=20)`
 
 ## Renderdeps
 
