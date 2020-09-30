@@ -21,11 +21,13 @@ def content_object_init(instance):
     if instance._content is None:
         return
     
-    post_text = bs4.BeautifulSoup(instance._content, features="html.parser").text
+    post_soup = bs4.BeautifulSoup(instance._content, features="html.parser")
+    post_text = post_soup.text
     word_count = len(post_text.split())
     instance.word_count = int(round(word_count, -1))
     instance.word_count_wpm = WPM
-    instance.est_read_time = (word_count // WPM) or "< 1"
+    instance.est_read_time = int(round(word_count // WPM)) or "< 1"
+    instance.link_count = len(post_soup.findAll("a", href=True))
 
 
 def register():

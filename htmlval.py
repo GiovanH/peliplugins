@@ -19,7 +19,7 @@ def content_object_init(instance):
     for anchor in soup_doc.findAll("a", href=True):
         url = anchor['href']
 
-        if url.startswith("#"):
+        if url.startswith("#") and url != "#":
             if url[1:] not in element_ids:
                 issues.append(f"'{anchor}' backlink has no referent")
 
