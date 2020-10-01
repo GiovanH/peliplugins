@@ -40,7 +40,7 @@ class AttachLinkInlineProcessor(LinkInlineProcessor):
 class AutoAttachExtension(Extension):
 
     def extendMarkdown(self, md):
-        md.inlinePatterns.register(AttachImageInlineProcessor(ATTACH_IMAGE_RE, md), 'attach_image', 150 + 1)
+        md.inlinePatterns.register(AttachImageInlineProcessor(ATTACH_IMAGE_RE, md), 'attach_image', 170 + 1)
         md.inlinePatterns.register(AttachLinkInlineProcessor(ATTACH_LINK_RE, md), 'attach_link', 160 + 1)
 
 def pelican_init(pelican_object):
