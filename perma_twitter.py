@@ -6,21 +6,101 @@ import os
 import re
 import tweepy
 import xml.etree.ElementTree as ET
+import html
 
-from jinja2 import Template
+from jinja2 import Environment
 # from pelican import generators
 from pelican import signals
 
 TWEETEMBED_RE = r"\[\![Tt]weet[^\]]*\]\(.+status\/(\d+).*?\)"
 TWEETLINK_RE = r"(https|http)://(www.){0,1}twitter\.com/[^/]+/status/(\d+).*?"
         
-TWEET_TEMPLATE = Template("""<p><blockquote class="twitter-tweet" data-lang="en" data-dnt="true">
-<p lang="und" dir="ltr">{{ full_text }}</p>
-<span>– {{ user.name }} (@{{ user.screen_name }})</span>
-<a href="https://twitter.com/{{ user.screen_name }}/status/{{ id }}">{{ created_at }}</a></blockquote>
-<script async="true" src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>""")
+DEBUG = True
+
+# TWEET_TEMPLATE = Template("""<p><blockquote class="twitter-tweet" data-lang="en" data-dnt="true">
+# <p lang="und" dir="ltr">{{ full_text }}</p>
+# <span>– {{ user.name }} (@{{ user.screen_name }})</span>
+# <a href="https://twitter.com/{{ user.screen_name }}/status/{{ id }}">{{ created_at }}</a></blockquote></p>""")
+
+# Add
+# <script async="true" src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+# to your renderdeps!
+
+TWEET_TEMPLATE_STR = """<blockquote class="twitter-tweet" data-lang="en" data-dnt="true" data-nosnippet="true">
+    <div class="header">
+        <a href="{{ user.url }}" title="{{ user.description|e }}">
+            <img src="{{ user.profile_image_url_https }}"
+                onerror="this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;"
+            ></img>
+            <div class="vertical">
+                <span class="name">{{ user.name|e }}</span>
+                <span class="at">@{{ user.screen_name }}</span>
+            </div>
+        </a>
+    </div>
+    <p lang="und" dir="ltr">{{ full_text|e|tw_stripents(id, entities, extended_entities or {})|replace("\n", "<br></br>") }}</p>
+    <div class="media" style="display: none;">{{ full_text|e|tw_entities(id, entities, extended_entities or {}) }}</div>
+    <a href="https://twitter.com/{{ user.screen_name }}/status/{{ id }}" target="_blank">{{ created_at }}</a>
+</blockquote>"""
 
 api = None
+
+def tw_entities(text, id, entities, extended_entities):
+    entities.update(extended_entities)
+
+    text = ""
+
+    try:
+
+        media = entities.get('media', [])
+        media_count = len(media)
+        for e in media:
+            if e['type'] == "photo":
+                src = html.escape(e['media_url_https'])
+                repl = f"""<a href="{e['expanded_url']}" target="_blank">
+    <img class="img count{media_count}" src="{src}"></img>
+</a>"""
+            elif e['type'] == "video":
+                src = html.escape(e['video_info']['variants'][0]['url'])
+                repl = f"""<video src="{src}" controls="true"></video>"""
+            elif e['type'] == "animated_gif":
+                src = html.escape(e['video_info']['variants'][0]['url'])
+                repl = f"""<video src="{src}" loop="true" playsinline="true" preload="auto"></video>"""
+            else:
+                raise NotImplementedError(e['type'])
+                if DEBUG:
+                    ET.fromstring(repl)
+            text += repl
+    except ET.ParseError as e:
+        print(repl)
+        raise e
+
+    return text
+
+def tw_stripents(text, id, entities, extended_entities):
+    entities.update(extended_entities)
+
+    for e in entities['urls']:
+        find = e['url']
+        src = html.escape(e['expanded_url'])
+        repl = f"<a href='{src}' target='_blank'>{e['display_url']}</a>"
+        if DEBUG:
+            ET.fromstring(repl)
+        text = text.replace(find, repl)
+
+    for e in entities.get('media', []):
+        find = e['url'] 
+        text = text.replace(find, "")
+
+    return text
+
+
+env = Environment()
+
+env.filters['tw_entities'] = tw_entities
+env.filters['tw_stripents'] = tw_stripents
+
+TWEET_TEMPLATE = env.from_string(TWEET_TEMPLATE_STR)
 
 
 def pelican_init(pelican_object):
@@ -56,7 +136,12 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
         except:
             return ET.fromstring(f"<p>ERROR! Can't load tweet <a href='{href}'>'{title}'</a></p>"), m.start(0), index
 
-        return ET.fromstring(TWEET_TEMPLATE.render(**tweet_json)), m.start(0), index
+        string = TWEET_TEMPLATE.render(**tweet_json)
+        try:
+            return ET.fromstring(string), m.start(0), index
+        except ET.ParseError as e:
+            print(string)
+            raise e
 
     def getLink(self, data, index):
         href, title, index, handled = super().getLink(data, index)
