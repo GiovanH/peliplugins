@@ -17,6 +17,8 @@ TWEETLINK_RE = r"(https|http)://(www.){0,1}twitter\.com/[^/]+/status/(\d+).*?"
         
 DEBUG = True
 
+# TODO: Clear support for *both* standalone and embeds
+
 # TWEET_TEMPLATE = Template("""<p><blockquote class="twitter-tweet" data-lang="en" data-dnt="true">
 # <p lang="und" dir="ltr">{{ full_text }}</p>
 # <span>– {{ user.name }} (@{{ user.screen_name }})</span>
