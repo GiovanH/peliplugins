@@ -30,7 +30,7 @@ DEBUG = True
 
 TWEET_TEMPLATE_STR = """<blockquote class="twitter-tweet" data-lang="en" data-dnt="true" data-nosnippet="true">
     <div class="header">
-        <a href="{{ user.url }}" title="{{ user.description|e }}">
+        <a href="https://twitter.com/{{ user.screen_name }}/" title="{{ user.description|e }}">
             <img src="{{ user.profile_image_url_https }}"
                 onerror="this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;"
             ></img>
