@@ -18,6 +18,8 @@ TWEETLINK_RE = r"(https|http)://(www.){0,1}twitter\.com/[^/]+/status/(\d+).*?"
 DEBUG = True
 
 # TODO: Clear support for *both* standalone and embeds
+# TODO: Standard retweets show RT and partial text
+# TODO: Replies don't reference the tweet they're replying to
 
 # TWEET_TEMPLATE = Template("""<p><blockquote class="twitter-tweet" data-lang="en" data-dnt="true">
 # <p lang="und" dir="ltr">{{ full_text }}</p>
@@ -136,6 +138,7 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
         try:
             tweet_json = getTweetJson(tweet_id)
         except:
+            logging.error("Can't load tweet " + tweet_id, exc_info=True)
             return ET.fromstring(f"<p>ERROR! Can't load tweet <a href='{href}'>'{title}'</a></p>"), m.start(0), index
 
         string = TWEET_TEMPLATE.render(**tweet_json)
