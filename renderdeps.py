@@ -24,7 +24,7 @@ def process_content(article):
     dirty = False
 
     for (args, kwargs), dep in dependencies:
-        logging.debug(f"Checking for '{args} {kwargs}'")
+        # logging.debug(f"Checking for '{args} {kwargs}'")
         if soup.find(*args, **kwargs):
             logging.info("Inserting dependency " + repr(dep))
             if use_soup:
@@ -34,7 +34,8 @@ def process_content(article):
                 article._content += dep
                 # just chuck it in
         else:
-            logging.debug("Not found")
+            # logging.debug("Not found")
+            pass
 
     if dirty:
         article._content = str(soup)
