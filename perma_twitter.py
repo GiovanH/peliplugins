@@ -42,8 +42,12 @@ TWEET_TEMPLATE_STR = """<blockquote class="twitter-tweet" data-lang="en" data-dn
             </div>
         </a>
     </div>
-    <p lang="und" dir="ltr">{{ full_text|e|tw_stripents(id, entities, extended_entities or {})|replace("\n", "<br></br>") }}</p>
-    <div class="media" style="display: none;">{{ full_text|e|tw_entities(id, entities, extended_entities or {}) }}</div>
+    <p>
+        {% if in_reply_to_status_id %}
+            <span class="replyto">Replying to <a class="prev" href="https://twitter.com/{{in_reply_to_screen_name}}/status/{{ in_reply_to_status_id }}">{{in_reply_to_screen_name}}</a>:</span>
+        {% endif %}
+        {{ full_text|e|replace("\n", "<br></br>")|tw_stripents(id, entities, extended_entities or {}) }}
+    </p>
     <a href="https://twitter.com/{{ user.screen_name }}/status/{{ id }}" target="_blank">{{ created_at }}</a>
 </blockquote>"""
 
@@ -69,7 +73,7 @@ def tw_entities(text, id, entities, extended_entities):
                 repl = f"""<video src="{src}" controls="true"></video>"""
             elif e['type'] == "animated_gif":
                 src = html.escape(e['video_info']['variants'][0]['url'])
-                repl = f"""<video src="{src}" loop="true" playsinline="true" preload="auto"></video>"""
+                repl = f"""<video src="{src}" loop="true" playsinline="true" controls="true" preload="auto"></video>"""
             else:
                 raise NotImplementedError(e['type'])
                 if DEBUG:
@@ -143,7 +147,7 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
 
         string = TWEET_TEMPLATE.render(**tweet_json)
         try:
-            return ET.fromstring(string), m.start(0), index
+            return self.md.htmlStash.store(string), m.start(0), index
         except ET.ParseError as e:
             print(string)
             raise e
@@ -192,6 +196,10 @@ def getTweetJson(tweet_id):
         with open(dest_path, "r") as fp:
             json_obj = json.load(fp)
             logging.info("Found saved tweet data for " + tweet_id)
+            # Temporary: Passthrough to RT
+            startswith = json_obj.get("full_text", json_obj.get("text", '')).startswith("RT @")
+            if startswith and (rt_obj := json_obj.get("retweeted_status")):
+                return rt_obj
             return json_obj
     except FileNotFoundError:
         # No file yet
