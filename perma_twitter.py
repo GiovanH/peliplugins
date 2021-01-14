@@ -70,7 +70,9 @@ def tw_entities(text, id, entities, extended_entities):
             if e['type'] == "photo":
                 src = html.escape(e['media_url_https'])
                 repl = f"""<a href="{e['expanded_url']}" target="_blank">
-    <img class="img count{media_count}" src="{src}"></img>
+    <img class="img count{media_count}" src="{src}"
+        onerror="this.onerror=null;this.src=`https://web.archive.org/web/0/${{this.src}}`;"
+    ></img>
 </a>"""
             elif e['type'] == "video":
                 src = html.escape(e['video_info']['variants'][0]['url'])
