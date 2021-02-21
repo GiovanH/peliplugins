@@ -25,9 +25,13 @@ class TwGalleryGenerator(pelican.generators.Generator):
 
         tweets = collections.defaultdict(lambda: collections.defaultdict(list))
         for path in tweet_paths:
-            with open(path, "r") as fd:
-                obj = json.load(fd)
-                dt = datetime.strptime(obj["created_at"], "%a %b %d %H:%M:%S +0000 %Y")
+            try:
+                with open(path, "r") as fd:
+                    obj = json.load(fd)
+                    dt = datetime.strptime(obj["created_at"], "%a %b %d %H:%M:%S +0000 %Y")
+            except:
+                logging.error(path, exc_info=True)
+                continue
 
             tweets[dt.year][dt.month].append(obj)
 
@@ -74,11 +78,21 @@ class TwGalleryGenerator(pelican.generators.Generator):
             # Write intermediate markdown
             logging.info("writing {0}".format(mdpath))
             with open(mdpath, "w", encoding="utf-8") as fd:
-                for tweet in sorted(corpus[year][month], key=lambda t: t['id']):
-                    desc = tweet.get('full_text') or tweet.get('text')
-                    desc = html.escape(desc).replace("\n", "\\n")
+                for tweet in sorted(corpus[year][month], key=lambda t: str(t['id'])):
+                    try:
+                        screen_name = tweet['user']['screen_name']
+                    except KeyError:
+                        # Old style imports
+                        screen_name = "giovan_h"
 
-                    fd.write(f"![{desc}](https://twitter.com/{tweet['user']['screen_name']}/status/{tweet.get('id')})\n")
+                    try:
+                        desc = tweet.get('full_text') or tweet.get('text')
+                        desc = html.escape(desc).replace("\n", "\\n")
+
+                        fd.write(f"![{desc}](https://twitter.com/{screen_name}/status/{tweet.get('id')})\n")
+                    except:
+                        logging.error(str(tweet), exc_info=True)
+                        continue
 
             # Process markdown w/ extensions
             content, metadata = MarkdownReader.read(mdpath)
