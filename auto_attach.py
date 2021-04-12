@@ -38,7 +38,6 @@ class AttachLinkInlineProcessor(LinkInlineProcessor):
         return el, start, index
 
 class AutoAttachExtension(Extension):
-
     def extendMarkdown(self, md):
         md.inlinePatterns.register(AttachImageInlineProcessor(ATTACH_IMAGE_RE, md), 'attach_image', 170 + 1)
         md.inlinePatterns.register(AttachLinkInlineProcessor(ATTACH_LINK_RE, md), 'attach_link', 160 + 1)

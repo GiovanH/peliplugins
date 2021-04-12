@@ -124,3 +124,9 @@ Automatically attaches dot-slash resources (`![](./img.png)`) using native pelic
 This only effects links beginning with `./`.
 
 There are no options to configure.
+
+## Related reading
+
+This one is very much tailored to my blog specifically, but it might be useful as a template. 
+
+Gathers up all the links classed `.related_reading` in all the articles and creates an aggregate page.
