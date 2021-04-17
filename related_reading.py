@@ -15,8 +15,12 @@ try:
 except ImportError:
     from urllib.parse import urljoin
 
+import logging
 from pelican import signals
 from pelican.generators import CachingGenerator
+
+
+logger = logging.getLogger(__name__)
 
 def unTypography(string):
     ret = string
@@ -72,15 +76,20 @@ class RelatedReadingAggregateGenerator(CachingGenerator):
         for page in pages:
             self.json_nodes.append(self.nodeFromPage(page))
 
+        keyf = lambda p: p['category']
+        related_reading = itertools.groupby(
+            sorted([p for p in self.json_nodes if p['links']], key=keyf), 
+            keyf
+        )
+
+        logger.info(str(related_reading))
+
         writer.write_file(
             name=self.save_as, 
             template=self.get_template("relatedreading"),
             context=self.context,
             relative_urls=self.settings['RELATIVE_URLS'],
-            related_reading=itertools.groupby(
-                [p for p in self.json_nodes if p['links']], 
-                lambda p: p['category']
-            )
+            related_reading=related_reading
         )
 
     def nodeFromPage(self, page):
