@@ -49,6 +49,8 @@ def add_deps(generators):
         if isinstance(generator, ArticlesGenerator):
             for article in generator.articles:
                 process_content(article)
+            for article in generator.hidden_articles:
+                process_content(article)
             for article in generator.drafts:
                 process_content(article)
             for article in generator.translations:

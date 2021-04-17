@@ -10,7 +10,7 @@ if not six.PY3:
 
 logger = logging.getLogger(__name__)
 source_files = []
-TYPES_TO_PROCESS = ['articles', 'pages', 'drafts']
+TYPES_TO_PROCESS = ['articles', 'hidden_articles', 'pages', 'drafts']
 
 
 REDIRECT_TEMPLATE = """
@@ -51,6 +51,7 @@ def link_source_files(generator):
 
                 write_to = os.path.join(post.settings['OUTPUT_PATH'], post.metadata['redirect'])
                 redirect_to = post.save_as
+                # TODO: If we bounced to C:/ here, error out
             except Exception:
                 logger.error("Error processing source file for post", exc_info=True)
                 continue
@@ -77,6 +78,7 @@ def write_source_files(*args, **kwargs):
     Called by the `page_writer_finalized` signal to process source files.
     """
     for source in source_files:
+        # TODO: If write_to is a file, skip the directory bits
         to_dir = source['redirect_write_to']
         os.makedirs(to_dir, exist_ok=True)
         encoding = 'utf-8'
