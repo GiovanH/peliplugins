@@ -30,9 +30,7 @@ class MarkdeepReader(BaseReader):
         __, plainname = os.path.split(filename)
 
         metadata = {
-            'title': plainname,
-            'category': 'Dev',
-            'date': '2012-12-01'
+            'title': plainname
         }
 
         parsed_metadata = {
