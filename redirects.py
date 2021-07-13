@@ -49,6 +49,10 @@ def link_source_files(generator):
                 # Get the full path to the original source file
                 # post_url = os.path.join(post.settings['OUTPUT_PATH'], post.save_as)
 
+                if post.metadata['redirect'].startswith("/"):
+                    logger.warning(f"Post redirect {post.metadata['redirect']!r} starts with /, should be a directory name ON /. Coercing.")
+                    post.metadata['redirect'] = post.metadata['redirect'][1:]
+
                 write_to = os.path.join(post.settings['OUTPUT_PATH'], post.metadata['redirect'])
                 redirect_to = post.save_as
                 # TODO: If we bounced to C:/ here, error out
@@ -79,10 +83,13 @@ def write_source_files(*args, **kwargs):
     """
     for source in source_files:
         # TODO: If write_to is a file, skip the directory bits
+        # this sort of works unimplemented???
         to_dir = source['redirect_write_to']
         os.makedirs(to_dir, exist_ok=True)
+        out_path = os.path.join(to_dir, "index.html")
+
         encoding = 'utf-8'
-        with open(os.path.join(to_dir, "index.html"), 'w', encoding=encoding) as text_out:
+        with open(out_path, 'w', encoding=encoding) as text_out:
             text_out.write(REDIRECT_TEMPLATE.format(url=source['redirect_to']))
             logger.info('Writing %s', to_dir)
 
