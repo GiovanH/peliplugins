@@ -82,7 +82,7 @@ class RelatedReadingAggregateGenerator(CachingGenerator):
             keyf
         )
 
-        logger.info(str(related_reading))
+        # logger.info(str(related_reading))
 
         writer.write_file(
             name=self.save_as, 
