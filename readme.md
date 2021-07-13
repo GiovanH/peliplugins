@@ -2,6 +2,38 @@
 
 they're all single-files because come *on*
 
+## Chrono
+
+Adds chonologically sorted versions of tag, category, and author index pages without replacing the main indices. 
+
+On tumblr, you can can browse a blog's tag in either order: chronological order or latest-first. The URL schemes look like this:
+
+Default: `https://{blog}.tumblr.com/tagged/{tag}/page/{i}``
+Chrono: `https://{blog}.tumblr.com/tagged/{tag}/chrono/page/{i}``
+
+This adds a generator with a similar effect.
+
+See also [getpelican/pelican #2903](https://github.com/getpelican/pelican/issues/2903)
+
+### Usage
+
+You must configure the `TAG_SAVE_AS_REVERSE`, `CATEGORY_SAVE_AS_REVERSE`, and `AUTHOR_SAVE_AS_REVERSE` format strings. The format is the same as their non-reversed counterparts, see example config:
+
+```python
+TAG_SAVE_AS = 'tag/{slug}/index.html'
+TAG_SAVE_AS_REVERSE = 'tag/{slug}/chrono/index.html'
+
+CATEGORIES_SAVE_AS = "category/index.html"
+CATEGORY_SAVE_AS = 'category/{slug}/index.html'
+CATEGORY_SAVE_AS_REVERSE = 'category/{slug}/chrono/index.html'
+
+AUTHORS_SAVE_AS = "author/index.html"
+AUTHOR_SAVE_AS = 'author/{slug}.html'
+AUTHOR_SAVE_AS_REVERSE = 'author/chrono/{slug}.html'
+```
+
+There is no default set for these options and generation will fail if they are not set in configuration. These should be configured by the user.
+
 ## Markdeep
 
 WIP support for [Markdeep](https://casual-effects.com/markdeep/) documents.
@@ -119,7 +151,7 @@ Anchorlinks will ignore all links with tags in `ANCHORLINKS_IGNORE`, which is `[
 
 Markdown only.
 
-Automatically attaches dot-slash resources (`![](./img.png)`) using native pelican attaching.
+Automatically attaches dot-slash resources (`![x](./img.png)`) using native pelican attaching.
 
 This only effects links beginning with `./`.
 
