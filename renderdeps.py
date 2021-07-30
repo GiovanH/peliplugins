@@ -40,7 +40,8 @@ def process_content(article):
     if dirty:
         article._content = str(soup)
     else:
-        logging.info("No dependencies in " + repr(article.slug))
+        # logging.debug("No dependencies in " + repr(article.slug))
+        pass
 
 
     return
