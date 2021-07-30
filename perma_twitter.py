@@ -5,6 +5,7 @@ import markdown
 import os
 import re
 import tweepy
+from tweepy.error import TweepError
 import xml.etree.ElementTree as ET
 import html
 import shutil
@@ -34,6 +35,9 @@ DEBUG = True
 TWEET_TEMPLATE_STR = """<blockquote class="twitter-tweet" data-lang="en" data-dnt="true" data-nosnippet="true">
     <div class="header">
     {% autoescape true %}
+        {% if retweeted_by %}
+            <span class="rtby"><a href="https://twitter.com/{{ retweeted_by.screen_name }}/" title="{{ retweeted_by.description|replace("\n", " ") }}">{{ retweeted_by.name }}</a></span>
+        {% endif %}
         <a href="https://twitter.com/{{ user.screen_name }}/" title="{{ user.description|replace("\n", " ") }}">
             <img src="{{ user.profile_image_url_https }}"
                 onerror="this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;"
@@ -147,13 +151,25 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
 
         try:
             tweet_json = getTweetJson(username, tweet_id)
+        except TweepError as e:
+            logging.error(f"Can't load tweet {username}/{tweet_id}: '{e}'")
+            reason = e.response.text
+            if e.response.status_code == 144:
+                reason = "Tweet has been deleted"
+            return ET.fromstring(f"<p>Couldn't find tweet <a href='{href}'>'{title}'</a> ({reason})</p>"), m.start(0), index
 
+        except:
+            logging.error("Can't load tweet " + tweet_id, exc_info=True)
+            return ET.fromstring(f"<p>ERROR! Can't load tweet <a href='{href}'>'{title}'</a></p>"), m.start(0), index
+
+        try:
             # Legacy support:
             tweet_json['entities'] = tweet_json.get('entities', {})
             tweet_json['full_text'] = tweet_json.get('full_text', tweet_json.get('text'))
             tweet_json['extended_entities'] = tweet_json.get('extended_entities', {})
             tweet_json['user'] = tweet_json.get('user', {})
             tweet_json['user']['screen_name'] = tweet_json['user'].get('screen_name', 'unknown')
+
         except:
             logging.error("Can't load tweet " + tweet_id, exc_info=True)
             return ET.fromstring(f"<p>ERROR! Can't load tweet <a href='{href}'>'{title}'</a></p>"), m.start(0), index
@@ -205,18 +221,19 @@ def getTweetJson(username, tweet_id):
     try:
         with open(dest_path, "r") as fp:
             json_obj = json.load(fp)
-            logging.info("Found saved tweet data for " + tweet_id)
+            # logging.debug("Found saved tweet data for " + tweet_id)
 
             # Temporary: Passthrough to RT
             startswith = json_obj.get("full_text", json_obj.get("text", '')).startswith("RT @")
             if startswith and (rt_obj := json_obj.get("retweeted_status")):
+                rt_obj['retweeted_by'] = json_obj.get('user', {})
                 return rt_obj
             else:
                 return json_obj
 
     except FileNotFoundError:
         # No file yet
-        logging.warning("Not seeing cached tweet for id " + tweet_id)
+        # logging.warning("Not seeing cached tweet for id " + tweet_id)
         # raise
 
         try:
@@ -228,6 +245,9 @@ def getTweetJson(username, tweet_id):
                 json.dump(status._json, fp, indent=2)
             return status._json
 
+        except TweepError as e:
+            # logging.error(f"Can't load tweet {username}/{tweet_id}: '{e}'")
+            raise
         except Exception:
             logging.error(f"Can't retrieve tweet with id '{tweet_id}'", exc_info=1)
             raise
