@@ -17,13 +17,18 @@ import pelican.readers
 class TwGalleryGenerator(pelican.generators.Generator):
     def __init__(self, context, settings, path, theme, output_path, *null):
         super().__init__(context, settings, path, theme, output_path)
-        self.glob = settings.get("TWGALLERY_GLOB")
+        glob_setting = settings.get("TWGALLERY_GLOB")
+
+        if isinstance(glob_setting, list):
+            self.globs = glob_setting
+        else:
+            self.globs = [glob_setting]
 
         self.output_path = output_path
         self.context = context
 
     def loadTweets(self):
-        tweet_paths = glob.glob(self.glob, recursive=True)
+        tweet_paths = sum((glob.glob(g, recursive=True) for g in self.globs), [])
         seen_tweet_ids = set()
 
         tweets = collections.defaultdict(lambda: collections.defaultdict(list))
@@ -134,10 +139,7 @@ class TwGalleryGenerator(pelican.generators.Generator):
 
         for i, (year, month) in enumerate(in_order_pages):
             print(year, month)
-
-            if year > 2019:
-                break
-
+            
             mdpath = os.path.join(self.output_path, "twgallery", f"{year}", f"{month}.md")
             htmlpath = f"twgallery/{year}/{month}.html"
             month_name = calendar.month_name[month]
