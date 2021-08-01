@@ -9,6 +9,7 @@ from tweepy.error import TweepError
 import xml.etree.ElementTree as ET
 import html
 import shutil
+import glob
 
 from jinja2 import Environment
 # from pelican import generators
@@ -17,6 +18,12 @@ from pelican import signals
 TWEETEMBED_RE = r"\[\![Tt]weet[^\]]*\]\(.+status\/(\d+).*?\)"
 TWEETLINK_RE = r"(https|http)://(www.){0,1}twitter\.com/([^/]+)/status/(\d+).*?"
         
+
+TWEET_FALLBACK_GLOB = None
+TWEET_FALLBACK_ON = False
+TWEET_FALLBACK_DICT = {}
+
+
 DEBUG = True
 
 # TODO: Clear support for *both* standalone and embeds
@@ -101,9 +108,12 @@ def tw_stripents(text, id, entities, extended_entities):
     for e in entities.get('urls', []):
         find = e['url']
         src = html.escape(e['expanded_url'])
-        repl = f"<a href='{src}' target='_blank'>{e['display_url']}</a>"
+        repl = f"<a href='{src}' target='_blank'>{html.escape(e['display_url'])}</a>"
         if DEBUG:
-            ET.fromstring(repl)
+            try:
+                ET.fromstring(repl)
+            except ET.ParseError:
+                logging.error(repl, exc_info=True)
         text = text.replace(find, repl)
 
     for e in entities.get('media', []):
@@ -127,6 +137,31 @@ def pelican_init(pelican_object):
     access_token = pelican_object.settings.get('TWEEPY_ACCESS_TOKEN', "")
     access_token_secret = pelican_object.settings.get('TWEEPY_ACCESS_TOKEN_SECRET', "")
 
+    global TWEET_FALLBACK_GLOB
+    global TWEET_FALLBACK_ON
+    global TWEET_FALLBACK_DICT
+    global TWEET_FALLBACK_MATCH
+
+    TWEET_FALLBACK_ON = pelican_object.settings.get('TWEET_FALLBACK_ON', False)
+    TWEET_FALLBACK_MATCH = pelican_object.settings.get(
+        'TWEET_FALLBACK_MATCH', 
+        lambda path: re.match(r".*s(\d+)\.json", path).groups(1)
+    )
+
+    if TWEET_FALLBACK_ON:
+        TWEET_FALLBACK_GLOB = pelican_object.settings['TWEET_FALLBACK_GLOB']
+
+        logging.info("Tweet fallback map test:")
+        for path in glob.iglob(TWEET_FALLBACK_GLOB, recursive=True):
+            logging.info("%s -> %s", path, TWEET_FALLBACK_MATCH(path))
+            break
+
+        logging.info("Building tweet fallback library...")
+        TWEET_FALLBACK_DICT = {
+            TWEET_FALLBACK_MATCH(path): path
+            for path in glob.glob(TWEET_FALLBACK_GLOB, recursive=True)
+        }
+        
     global api
     auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
@@ -156,7 +191,7 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
             reason = e.response.text
             if e.response.status_code == 144:
                 reason = "Tweet has been deleted"
-            return ET.fromstring(f"<p>Couldn't find tweet <a href='{href}'>'{title}'</a> ({reason})</p>"), m.start(0), index
+            return ET.fromstring(f"<p>Couldn't find tweet <a href='{href}'>'{title or tweet_id}'</a> ({reason})</p>"), m.start(0), index
 
         except:
             logging.error("Can't load tweet " + tweet_id, exc_info=True)
@@ -174,12 +209,12 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
             logging.error("Can't load tweet " + tweet_id, exc_info=True)
             return ET.fromstring(f"<p>ERROR! Can't load tweet <a href='{href}'>'{title}'</a></p>"), m.start(0), index
 
+        string = tweet_id  # For error case only
         try:
             string = TWEET_TEMPLATE.render(**tweet_json)
             return self.md.htmlStash.store(string), m.start(0), index
         except ET.ParseError as e:
-            print(string)
-            print(TWEET_TEMPLATE)
+            logging.error(string, exc_info=True)
             raise e
 
     def getLink(self, data, index):
@@ -247,10 +282,40 @@ def getTweetJson(username, tweet_id):
 
         except TweepError as e:
             # logging.error(f"Can't load tweet {username}/{tweet_id}: '{e}'")
-            raise
+            if TWEET_FALLBACK_ON:
+                try:
+                    return getTweetJsonFallback(username, tweet_id)
+                except FileNotFoundError as e2:
+                    logging.error(str(e2), exc_info=False)
+                    raise e
+            else:
+                raise
         except Exception:
             logging.error(f"Can't retrieve tweet with id '{tweet_id}'", exc_info=1)
             raise
+
+def getTweetJsonFallback(username, tweet_id):
+    tweet_id = str(tweet_id)
+    dest_dir = os.path.join("tweets", username)
+    dest_path = os.path.join(dest_dir, f"s{tweet_id}.json")
+
+    try:
+        src_path = TWEET_FALLBACK_DICT[tweet_id]
+    except KeyError:
+        raise FileNotFoundError(f"'{tweet_id}' not in fallback dictionary")
+
+    # If we're at the fallback, there shouldn't be a normal file.
+    assert not os.path.isfile(dest_path)
+
+    # old_path = os.path.join("tweets", username[:3].lower(), username, f"s{tweet_id}.json")
+    if os.path.isfile(src_path):
+        logging.info("Found fallback tweet data path '%s', copying to '%s'", src_path, dest_path)
+        os.makedirs(dest_dir, exist_ok=True)
+        shutil.copy2(src_path, dest_path)
+    else:
+        raise FileNotFoundError(f"'{tweet_id}' in fallback dictionary but not on disk")
+
+    return getTweetJson(username, tweet_id)
 
 
 def register():
