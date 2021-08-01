@@ -1,7 +1,7 @@
 import logging
 from pelican import signals
 import bs4
-# import nltk
+import nltk.tokenize
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +20,15 @@ def content_object_init(instance):
     """
     if instance._content is None:
         return
+
+    # TODO: This is too slow. Surely we don't need BS4 for this?
     
     post_soup = bs4.BeautifulSoup(instance._content, features="html.parser")
     post_text = post_soup.text
-    word_count = len(post_text.split())
+
+    tokenizer = nltk.tokenize.RegexpTokenizer(r'\w+')
+    word_count = len(tokenizer.tokenize(post_text))
+
     instance.word_count = int(round(word_count, -1))
     instance.word_count_wpm = WPM
     instance.est_read_time = int(round(word_count // WPM)) or "< 1"
