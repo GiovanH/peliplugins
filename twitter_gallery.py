@@ -26,6 +26,7 @@ class TwGalleryGenerator(pelican.generators.Generator):
 
         self.output_path = output_path
         self.context = context
+        self.RAW_PAGES_TO_INDEX = []
 
     def loadTweets(self):
         tweet_paths = sum((glob.glob(g, recursive=True) for g in self.globs), [])
@@ -198,6 +199,7 @@ class TwGalleryGenerator(pelican.generators.Generator):
                 this_page_ref=this_page_ref,
                 this_page_label=this_page_label
             )
+            self.RAW_PAGES_TO_INDEX.append(htmlpath)
 
             # Shift refs back
             prev_page_ref = this_page_ref
@@ -205,6 +207,9 @@ class TwGalleryGenerator(pelican.generators.Generator):
 
             this_page_ref = next_page_ref
             this_page_label = next_page_label
+
+        self.context['RAW_PAGES_TO_INDEX'] = []
+        self._update_context(('RAW_PAGES_TO_INDEX',))
 
 def get_generators(generators):
     return TwGalleryGenerator
