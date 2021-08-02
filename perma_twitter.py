@@ -132,10 +132,10 @@ TWEET_TEMPLATE = env.from_string(TWEET_TEMPLATE_STR)
 
 
 def pelican_init(pelican_object):
-    consumer_key = pelican_object.settings.get('TWEEPY_CONSUMER_KEY', "")
-    consumer_secret = pelican_object.settings.get('TWEEPY_CONSUMER_SECRET', "")
-    access_token = pelican_object.settings.get('TWEEPY_ACCESS_TOKEN', "")
-    access_token_secret = pelican_object.settings.get('TWEEPY_ACCESS_TOKEN_SECRET', "")
+    consumer_key = pelican_object.settings.get('TWEEPY_CONSUMER_KEY')
+    consumer_secret = pelican_object.settings.get('TWEEPY_CONSUMER_SECRET')
+    access_token = pelican_object.settings.get('TWEEPY_ACCESS_TOKEN')
+    access_token_secret = pelican_object.settings.get('TWEEPY_ACCESS_TOKEN_SECRET')
 
     global TWEET_FALLBACK_GLOB
     global TWEET_FALLBACK_ON
@@ -163,9 +163,13 @@ def pelican_init(pelican_object):
         }
         
     global api
-    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-    auth.set_access_token(access_token, access_token_secret)
-    api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
+    try:
+        assert consumer_key
+        auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+        auth.set_access_token(access_token, access_token_secret)
+        api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
+    except:
+        logging.info("Tweepy not configured; using local tweets only.")
 
     os.makedirs("tweets", exist_ok=True)
 
@@ -272,6 +276,8 @@ def getTweetJson(username, tweet_id):
         # raise
 
         try:
+            assert api
+
             status = api.get_status(tweet_id, tweet_mode='extended')
             logging.info("Downloaded new tweet for id " + tweet_id)
 
@@ -280,7 +286,7 @@ def getTweetJson(username, tweet_id):
                 json.dump(status._json, fp, indent=2)
             return status._json
 
-        except TweepError as e:
+        except (TweepError, AssertionError) as e:
             # logging.error(f"Can't load tweet {username}/{tweet_id}: '{e}'")
             if TWEET_FALLBACK_ON:
                 try:
