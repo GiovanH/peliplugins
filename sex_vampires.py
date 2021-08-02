@@ -63,9 +63,13 @@ class TipuesearchContentGenerator(CachingGenerator):
         for article in self.context['articles']:
             pages += article.translations
 
+        # Process raw pages
+        for srclink in self.context.get('RAW_PAGES_TO_INDEX', []):
+            self.json_nodes.append(self.nodeFromRawPage(srclink))
+
         # Process template pages
         for srclink in self.tpages:
-            self.json_nodes.append(self.nodeFromTPage(srclink))
+            self.json_nodes.append(self.nodeFromRawPage(self.tpages[srclink]))
 
         # Process non-template pages
         for page in pages:
@@ -109,10 +113,10 @@ class TipuesearchContentGenerator(CachingGenerator):
 
         return node
 
-    def nodeFromTPage(self, srclink):
+    def nodeFromRawPage(self, srclink):
         # Takes a url to a template page and creates a search node
 
-        srcfile = open(os.path.join(self.output_path, self.tpages[srclink]), encoding='utf-8')
+        srcfile = open(os.path.join(self.output_path, srclink), encoding='utf-8')
         soup = BeautifulSoup(srcfile, 'html.parser')
 
         # Only printable characters
@@ -128,7 +132,7 @@ class TipuesearchContentGenerator(CachingGenerator):
 
         # Should set default category?
         page_category = 'page'
-        page_url = urljoin(self.siteurl, self.tpages[srclink])
+        page_url = urljoin(self.siteurl, srclink)
 
         node = {
             'title': page_title,
@@ -138,7 +142,6 @@ class TipuesearchContentGenerator(CachingGenerator):
         }
 
         return node
-
 
 def get_generators(generators):
     return TipuesearchContentGenerator
