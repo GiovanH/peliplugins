@@ -13,6 +13,8 @@ def process_content(article):
     Pelican callback
     """
 
+    # TODO: This is too slow
+
     if article._content is None:
         logging.warning(f"{article.title} is empty!")
         return
