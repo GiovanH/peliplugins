@@ -85,7 +85,6 @@ def content_object_init(instance):
     stats['read_mins'] = stats['read_mins_bq'] + stats['read_mins_nbq']
 
     stats['word_counts_nbq'] = word_counts_nbq
-    stats['debug'] = str(debug)
 
     # Calculate Flesch-kincaid readbility stats
     # Stats don't care about sentence order so we can just concat the chunks together
