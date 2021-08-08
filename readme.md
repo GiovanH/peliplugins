@@ -9,6 +9,7 @@ Adds chonologically sorted versions of tag, category, and author index pages wit
 On tumblr, you can can browse a blog's tag in either order: chronological order or latest-first. The URL schemes look like this:
 
 Default: `https://{blog}.tumblr.com/tagged/{tag}/page/{i}``
+
 Chrono: `https://{blog}.tumblr.com/tagged/{tag}/chrono/page/{i}``
 
 This adds a generator with a similar effect.
@@ -120,18 +121,35 @@ It is refactored for ease of use and efficiency, and has some additional tweaks 
 
 - Does not include the content of `<script>` tags, even on template pages
 
-
 ## Wordcount
 
 Estimates the word count and reading time of articles.
 
-Appends the following attributes to each article:
+Appends the `stats` object to each article, with the following information:
 
-- `word_count`, which is rounded to the nearest 10 words
-- `instance.est_read_time`, the estimated read time in minutes
-- `instance.word_count_wpm`, which is the WPM used in the read time calculation.
+- `wc`: how many words
+- `read_mins`: how many minutes would it take to read this article, based on configured WPM
+- `word_counts`: Counter object with frquency count of all the words in the article
+- `fi`: Flesch-kincaid Index/ Reading Ease (see: http://en.wikipedia.org/wiki/Flesch%E2%80%93Kincaid_readability_tests)
+- `fk`: Flesch-kincaid Grade Level
+
+Example:
+
+```python
+{
+    'wc': 2760,
+    'fi': '65.94',
+    'fk': '7.65',
+    'word_counts': Counter({u'to': 98, u'a': 90, u'the': 83, u'of': 50, ...}),
+    'read_mins': 12
+}
+```
+
+This output should roughly match the output of [post_stats](https://github.com/getpelican/pelican-plugins/tree/master/post_stats).
 
 These attributes are readable by Jinja and can be used in templates.
+
+Some functions in this plugin derived from [post_stats](https://github.com/getpelican/pelican-plugins/tree/master/post_stats), after I learned it existed.
 
 ### Configuration
 
@@ -146,6 +164,8 @@ The only configuration is an optional
 Anchorlinks is designed to be used with additional CSS styling to differentiate the anchorlinks from other links.
 
 Anchorlinks will ignore all links with tags in `ANCHORLINKS_IGNORE`, which is `["footnote-ref", "toclink"]` by default.
+
+*You probably don't want this. You probably want the `[href^="#"]` selector instead.*
 
 ## Autoattach
 

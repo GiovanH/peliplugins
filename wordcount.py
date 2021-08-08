@@ -44,10 +44,15 @@ def roundCounterToCount(counter):
     return count
 
 def getRawText(instance):
+    soup = bs4.BeautifulSoup(instance._content, 'html.parser')
+    bq_text = []
+    for bq in soup.find_all("blockquote"):
+        if not bq.find("blockquote"):
+            # Must not be a root with nested blockquotes inside
+            bq_text.append(bq.getText())
+            bq.extract()
 
-    bq_text = bs4.BeautifulSoup(instance._content, 'html.parser', parse_only=only_blockquotes).getText()
-    nbq_text = bs4.BeautifulSoup(instance._content, 'html.parser', parse_only=no_blockquotes).getText()
-    return bq_text, nbq_text
+    return " ".join(bq_text), soup.getText()
 
 def content_object_init(instance):
     """
@@ -67,15 +72,20 @@ def content_object_init(instance):
     stats['word_count_wpm'] = WPM
 
     word_counts_bq = getWordCounter(bq_text)
+    # stats['bq_text'] = bq_text
     stats['wc_bq'] = roundCounterToCount(word_counts_bq)
     stats['read_mins_bq'] = stats['wc_bq'] // WPM
 
-    stats['word_counts_nbq'] = getWordCounter(nbq_text)
-    stats['wc_nbq'] = roundCounterToCount(stats['word_counts_nbq'])
+    word_counts_nbq = getWordCounter(nbq_text)
+    # stats['nbq_text'] = nbq_text
+    stats['wc_nbq'] = roundCounterToCount(word_counts_nbq)
     stats['read_mins_nbq'] = stats['wc_nbq'] // WPM
 
     stats['wc'] = stats['wc_bq'] + stats['wc_nbq']
     stats['read_mins'] = stats['read_mins_bq'] + stats['read_mins_nbq']
+
+    stats['word_counts_nbq'] = word_counts_nbq
+    stats['debug'] = str(debug)
 
     # Calculate Flesch-kincaid readbility stats
     # Stats don't care about sentence order so we can just concat the chunks together
