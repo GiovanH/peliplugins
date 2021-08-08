@@ -26,9 +26,7 @@ def process_content(article):
     soup_doc = bs4.BeautifulSoup(article._content, 'html.parser')
 
     for anchor in soup_doc.findAll("a", href=True):
-        url = anchor['href']
-
-        if url.startswith("#"):
+        if anchor['href'].startswith("#"):
             tag_class = anchor.get('class', [])
             if not any(c in tag_class for c in ignore_tags):
                 anchor['class'] = tag_class + ['anchorlink']

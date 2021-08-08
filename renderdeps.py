@@ -7,10 +7,12 @@ from pelican.generators import ArticlesGenerator, PagesGenerator, TemplatePagesG
 
 RENDERDEPS_USE_SOUP_DEFAULT = True
 
-def process_content(article):
+def process_content(article, generator=None):
     """
     Pelican callback
     """
+
+    # TODO: This is far too slow.
 
     if article._content is None:
         logging.warning(f"{article.title} is empty!")
@@ -42,8 +44,6 @@ def process_content(article):
     else:
         # logging.debug("No dependencies in " + repr(article.slug))
         pass
-
-
     return
 
 
@@ -74,7 +74,7 @@ def add_deps(generators):
                 if getattr(generator, attr, None)
             ], [])
             for document in documents:
-                process_content(document)
+                process_content(document, generator)
         else:
             logging.debug(f"Renderdeps: Unhandled generator {generator}")
 
