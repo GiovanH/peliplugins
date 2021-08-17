@@ -69,7 +69,7 @@ class TipuesearchContentGenerator(CachingGenerator):
 
         # Process template pages
         for srclink in self.tpages:
-            self.json_nodes.append(self.nodeFromRawPage(self.tpages[srclink]))
+            self.json_nodes.append(self.nodeFromRawPage(srclink))
 
         # Process non-template pages
         for page in pages:

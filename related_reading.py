@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Better tipue search
-
-"""
 
 import os.path
 import re
@@ -70,7 +66,7 @@ class RelatedReadingAggregateGenerator(CachingGenerator):
 
         # Process template pages
         for srclink in self.tpages:
-            self.json_nodes.append(self.nodeFromTPage(srclink))
+            self.json_nodes.append(self.nodeFromRawPage(srclink))
 
         # Process non-template pages
         for page in pages:
@@ -123,10 +119,10 @@ class RelatedReadingAggregateGenerator(CachingGenerator):
 
         return node
 
-    def nodeFromTPage(self, srclink):
+    def nodeFromRawPage(self, srclink):
         # Takes a url to a template page and creates a search node
 
-        srcfile = open(os.path.join(self.output_path, self.tpages[srclink]), encoding='utf-8')
+        srcfile = open(os.path.join(self.output_path, srclink), encoding='utf-8')
         soup = BeautifulSoup(srcfile, 'html.parser')
 
         # Only printable characters
