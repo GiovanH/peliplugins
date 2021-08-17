@@ -41,7 +41,7 @@ def process_content(instance, generator=None):
                     issues.append(f"Summary length is {len(instance.summary)}/{SUMMARY_MAX_LENGTH}")
                     # issues.append(f"{instance.summary[:200]} ... {instance.summary[-200:]}")
                 else:
-                    issues.append(f"Auto summary length is {len(instance.summary)}/{SUMMARY_MAX_LENGTH}")
+                    issues.append(f"Unsummarized article length is {len(instance.summary)}/{SUMMARY_MAX_LENGTH}")
         else:
             issues.append(f"Missing summary")
 
@@ -72,4 +72,10 @@ def register():
     Part of Pelican API
     """
     # signals.content_object_init.connect(content_object_init)
-    signals.all_generators_finalized.connect(all_generators_finalized)
+    # signals.all_generators_finalized.connect(all_generators_finalized)
+    signals.article_generator_write_article.connect(
+        lambda gen, content: process_content(content, gen)
+    )
+    signals.page_generator_write_page.connect(
+        lambda gen, content: process_content(content, gen)
+    )
