@@ -46,6 +46,63 @@ Supported extensions for markdeep are `.mdhtml` and `.md.html`, although the sec
 
 There are some cases where Markdeep documents do not render correctly due to bugs in Markdeep itself. These issues have been reported and may be fixed in the future.
 
+## Full Outline
+
+Generates a page based on the outline of every article on the site. **Sections are required for this to work.**
+
+The `full_outline.html` template page will be generated with the `full_outline` object, which is a recursive list of sections grouped by category.
+
+- `full_outline` (List)
+    + Category (List)
+        * Article
+            - Title (Title string)
+            - Url (url string)
+            - Page (page object)
+            - Children (list)
+                + Child
+                    * id (`id` attribute)
+                    * title (header title)
+                    * url (page url, helper)
+                    * Children (List, recursive)
+
+Example jinja template:
+
+```html
+{% macro render_toc(nodes) %}
+{% if nodes %}
+<ul>
+    {% for node in nodes %}
+    <li><a href="{{ SITEURL }}/{{ node.url }}#{{ node.id }}">{{ node.title }}</a></li>
+    {{ render_toc(node.children) }}
+    {% endfor %}
+</ul>
+{% endif %}
+{% endmacro %}
+
+{% block content %}
+<section id="content" class="post-card">
+  <article class="full">
+
+    {% for category, cats_nodes in full_outline %}
+    <h2>
+        <a href="{{ SITEURL }}/category/{{category}}">{{category}}</a>
+    </h2>
+    <ul>
+        {% for node in cats_nodes %}
+        <li>
+            <h3><a href="{{ SITEURL }}/{{ node.url }}">{{ node.title }}</a></h3>
+            {{ render_toc(node.children) }}
+        </li>
+        {% endfor %}
+    </ul>
+    {% endfor %}
+
+  </article>
+</section>
+{% endblock %}
+
+```
+
 ## Perma twitter
 
 Markdown only.
