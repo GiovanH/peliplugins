@@ -56,15 +56,16 @@ TWEET_TEMPLATE_STR = """<blockquote class="twitter-tweet" data-lang="en" data-dn
         </a>
     {% endautoescape %}
     </div>
-    <p>
+    <div>
         {% if in_reply_to_status_id %}
             <span class="replyto">Replying to <a class="prev" href="https://twitter.com/{{in_reply_to_screen_name}}/status/{{ in_reply_to_status_id }}">{{in_reply_to_screen_name}}</a>:</span>
         {% endif %}
-        {{ full_text|e|replace("\n", "<br></br>")|tw_stripents(id, entities, extended_entities or {}) }}
-    </p>
+        <p>{{ full_text|e|replace("\n\n", "</p><p>")|replace("\n", "</p><p>")|tw_stripents(id, entities, extended_entities or {}) }}</p>
+    </div>
     <div class="media" style="display: none;">{{ full_text|e|tw_entities(id, entities, extended_entities or {}) }}</div>
     <a href="https://twitter.com/{{ user.screen_name }}/status/{{ id }}" target="_blank">{{ created_at }}</a>
-</blockquote>"""
+</blockquote>
+<!-- ![{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }}) -->"""
 
 api = None
 
@@ -187,6 +188,9 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
         href, username, tweet_id, title, index, handled = self.getLink(data, index)
         if not handled:
             return None, None, None
+
+        # if not title:
+        #     logging.warning(f"Tweet {username}/{tweet_id} is missing its title!")
 
         try:
             tweet_json = getTweetJson(username, tweet_id)
