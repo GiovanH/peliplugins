@@ -72,10 +72,11 @@ def register():
     Part of Pelican API
     """
     # signals.content_object_init.connect(content_object_init)
-    # signals.all_generators_finalized.connect(all_generators_finalized)
-    signals.article_generator_write_article.connect(
-        lambda gen, content: process_content(content, gen)
-    )
-    signals.page_generator_write_page.connect(
-        lambda gen, content: process_content(content, gen)
-    )
+    signals.all_generators_finalized.connect(all_generators_finalized)
+    # logging.info("Register")
+    # signals.article_generator_write_article.connect(
+    #     lambda gen, content: process_content(content, gen)
+    # )
+    # signals.page_generator_write_page.connect(
+    #     lambda gen, content: process_content(content, gen)
+    # )
