@@ -42,9 +42,12 @@ def process_content(instance, generator=None):
                     # issues.append(f"{instance.summary[:200]} ... {instance.summary[-200:]}")
                 else:
                     issues.append(f"Unsummarized article length is {len(instance.summary)}/{SUMMARY_MAX_LENGTH}")
+                    if instance.has_summary:
+                        issues.append(f"Article incorrectly has 'has_summary' ste to True!")
+
         else:
             issues.append(f"Missing summary")
-
+        
     if issues:
         logging.error(f"HTML validation errors in {instance.relative_source_path}:" + "\n" + "\n".join(issues))
 
@@ -66,13 +69,28 @@ def all_generators_finalized(generators):
         else:
             logging.debug(f"Renderdeps: Unhandled generator {generator}")
 
+def article_writer_finalized(generator, writer):
+    # Process the articles and pages
+
+    documents = sum([
+        getattr(generator, attr, None)
+        for attr in TYPES_TO_PROCESS
+        if getattr(generator, attr, None)
+    ], [])
+    for document in documents:
+        process_content(document, generator)
+
 
 def register():
     """
     Part of Pelican API
     """
     # signals.content_object_init.connect(content_object_init)
-    signals.all_generators_finalized.connect(all_generators_finalized)
+
+    # signals.all_generators_finalized.connect(all_generators_finalized)
+    signals.article_writer_finalized.connect(article_writer_finalized)
+    signals.page_writer_finalized.connect(article_writer_finalized)
+
     # logging.info("Register")
     # signals.article_generator_write_article.connect(
     #     lambda gen, content: process_content(content, gen)
