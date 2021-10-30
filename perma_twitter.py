@@ -60,12 +60,12 @@ TWEET_TEMPLATE_STR = """<blockquote class="twitter-tweet" data-lang="en" data-dn
         {% if in_reply_to_status_id %}
             <span class="replyto">Replying to <a class="prev" href="https://twitter.com/{{in_reply_to_screen_name}}/status/{{ in_reply_to_status_id }}">{{in_reply_to_screen_name}}</a>:</span>
         {% endif %}
-        <p>{{ full_text|e|replace("\n\n", "</p><p>")|replace("\n", "</p><p>")|tw_stripents(id, entities, extended_entities or {}) }}</p>
+        <p>{{ full_text|e|replace("\n\n", "</p><p>")|replace("\n", "</p><p>")|tw_stripents(id, entities, extended_entities or {})|replace("&amp;", "&") }}</p>
     </div>
     <div class="media" style="display: none;">{{ full_text|e|tw_entities(id, entities, extended_entities or {}) }}</div>
     <a href="https://twitter.com/{{ user.screen_name }}/status/{{ id }}" target="_blank">{{ created_at }}</a>
 </blockquote>
-<!-- ![{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }}) -->"""
+<!-- {% if not md_title %}!{% endif %}[{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }}) -->"""
 
 api = None
 
@@ -181,11 +181,11 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
     """ Return a img element from the given match. """
 
     def handleMatch(self, m, data):
-        text, index, handled = self.getText(data, m.end(0))
+        title, index, handled = self.getText(data, m.end(0))
         if not handled:
             return None, None, None
 
-        href, username, tweet_id, title, index, handled = self.getLink(data, index)
+        href, username, tweet_id, __, index, handled = self.getLink(data, index)
         if not handled:
             return None, None, None
 
@@ -219,7 +219,7 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
 
         string = tweet_id  # For error case only
         try:
-            string = TWEET_TEMPLATE.render(**tweet_json)
+            string = TWEET_TEMPLATE.render(md_title=title, **tweet_json)
             return self.md.htmlStash.store(string), m.start(0), index
         except ET.ParseError as e:
             logging.error(string, exc_info=True)
