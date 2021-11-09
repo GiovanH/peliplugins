@@ -15,8 +15,8 @@ from jinja2 import Environment
 # from pelican import generators
 from pelican import signals
 
-TWEETEMBED_RE = r"\[\![Tt]weet[^\]]*\]\(.+status\/(\d+).*?\)"
 TWEETLINK_RE = r"(https|http)://(www.){0,1}twitter\.com/([^/]+)/status/(\d+).*?"
+TWEETEMBED_NOTITLE_RE = r"\!\[\]\(" + TWEETLINK_RE + r"\)"
         
 
 TWEET_FALLBACK_GLOB = None
@@ -130,7 +130,7 @@ env.filters['tw_entities'] = tw_entities
 env.filters['tw_stripents'] = tw_stripents
 
 TWEET_TEMPLATE = env.from_string(TWEET_TEMPLATE_STR)
-
+TWEET_EMBED_TEMPLATE = env.from_string("""![{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }})""")
 
 def pelican_init(pelican_object):
     consumer_key = pelican_object.settings.get('TWEEPY_CONSUMER_KEY')
@@ -331,3 +331,27 @@ def getTweetJsonFallback(username, tweet_id):
 def register():
     """Plugin registration"""
     signals.initialized.connect(pelican_init)
+
+
+def replaceBlanksInFile(filepath):
+    with open(filepath, "r", encoding="utf-8") as fp:
+        body = fp.read()
+
+    dirty = False
+    for match in re.finditer(TWEETEMBED_NOTITLE_RE, body):
+        print(filepath, match)
+        http, www, username, tweet_id = match.groups()
+        rendered = TWEET_EMBED_TEMPLATE.render(**getTweetJson(username, tweet_id))
+        body = body.replace(match.group(0), rendered)
+        dirty = True
+    
+    if dirty:
+        with open(filepath, "w", encoding="utf-8") as fp:
+            fp.write(body)
+    
+
+if __name__ == "__main__":
+    import sys
+    for globstr in sys.argv[1:]:
+        for filepath in glob.glob(globstr, recursive=True):
+            replaceBlanksInFile(filepath)
