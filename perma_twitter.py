@@ -64,8 +64,9 @@ TWEET_TEMPLATE_STR = """<blockquote class="twitter-tweet" data-lang="en" data-dn
     </div>
     <div class="media" style="display: none;">{{ full_text|e|tw_entities(id, entities, extended_entities or {}) }}</div>
     <a href="https://twitter.com/{{ user.screen_name }}/status/{{ id }}" target="_blank">{{ created_at }}</a>
-</blockquote>
-<!-- {% if not md_title %}!{% endif %}[{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }}) -->"""
+</blockquote>"""
+
+# <!-- {% if not md_title %}!{% endif %}[{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }}) -->
 
 api = None
 
@@ -220,6 +221,7 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
         string = tweet_id  # For error case only
         try:
             string = TWEET_TEMPLATE.render(md_title=title, **tweet_json)
+            # return ET.fromstring(string), m.start(0), m.end(0)
             return self.md.htmlStash.store(string), m.start(0), index
         except ET.ParseError as e:
             logging.error(string, exc_info=True)
@@ -340,10 +342,13 @@ def replaceBlanksInFile(filepath):
     dirty = False
     for match in re.finditer(TWEETEMBED_NOTITLE_RE, body):
         print(filepath, match)
-        http, www, username, tweet_id = match.groups()
-        rendered = TWEET_EMBED_TEMPLATE.render(**getTweetJson(username, tweet_id))
-        body = body.replace(match.group(0), rendered)
-        dirty = True
+        try:
+            http, www, username, tweet_id = match.groups()
+            rendered = TWEET_EMBED_TEMPLATE.render(**getTweetJson(username, tweet_id))
+            body = body.replace(match.group(0), rendered)
+            dirty = True
+        except:
+            logging.warning("Couldn't get tweet", exc_info=True)
     
     if dirty:
         with open(filepath, "w", encoding="utf-8") as fp:
