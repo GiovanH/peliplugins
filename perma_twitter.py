@@ -16,7 +16,7 @@ from jinja2 import Environment
 from pelican import signals
 
 TWEETLINK_RE = r"(https|http)://(www.){0,1}twitter\.com/([^/]+)/status/(\d+).*?"
-TWEETEMBED_NOTITLE_RE = r"\!\[\]\(" + TWEETLINK_RE + r"\)"
+TWEETEMBED_NOTITLE_RE = r"(?<=\!\[\]\()" + TWEETLINK_RE + r"\)"
         
 
 TWEET_FALLBACK_GLOB = None
@@ -131,7 +131,6 @@ env.filters['tw_entities'] = tw_entities
 env.filters['tw_stripents'] = tw_stripents
 
 TWEET_TEMPLATE = env.from_string(TWEET_TEMPLATE_STR)
-TWEET_EMBED_TEMPLATE = env.from_string("""![{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }})""")
 
 def pelican_init(pelican_object):
     consumer_key = pelican_object.settings.get('TWEEPY_CONSUMER_KEY')
@@ -170,6 +169,7 @@ def pelican_init(pelican_object):
         auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
         auth.set_access_token(access_token, access_token_secret)
         api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
+        logging.info("Logged in to twitter via Tweepy")
     except:
         logging.info("Tweepy not configured; using local tweets only.")
 
@@ -282,7 +282,8 @@ def getTweetJson(username, tweet_id):
         # raise
 
         try:
-            assert api
+            if not api:
+                raise FileNotFoundError("API configuration must be passed in to use network functionality")
 
             status = api.get_status(tweet_id, tweet_mode='extended')
             logging.info("Downloaded new tweet for id " + tweet_id)
@@ -334,6 +335,7 @@ def register():
     """Plugin registration"""
     signals.initialized.connect(pelican_init)
 
+TWEET_EMBED_TEMPLATE = env.from_string("""{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }})""")
 
 def replaceBlanksInFile(filepath):
     with open(filepath, "r", encoding="utf-8") as fp:
@@ -345,10 +347,16 @@ def replaceBlanksInFile(filepath):
         try:
             http, www, username, tweet_id = match.groups()
             rendered = TWEET_EMBED_TEMPLATE.render(**getTweetJson(username, tweet_id))
-            body = body.replace(match.group(0), rendered)
+            whole_md_object = "](" + match.group(0)
+
+            # logging.warning(f"{whole_md_object!r} -> {rendered!r}")
+            body = body.replace(whole_md_object, rendered)
             dirty = True
+        except FileNotFoundError:
+            logging.warning(f"No saved info for tweet {match!r} {(username, tweet_id)!r}", exc_info=False)
         except:
             logging.warning("Couldn't get tweet", exc_info=True)
+            logging.warning(str(match.groups()), exc_info=False)
     
     if dirty:
         with open(filepath, "w", encoding="utf-8") as fp:
