@@ -24,6 +24,10 @@ TWEET_FALLBACK_ON = False
 TWEET_FALLBACK_DICT = {}
 
 
+TWEET_RECURSE_THREADS = True
+TWEET_RECURSE_QRTS = True
+
+
 DEBUG = True
 
 # TODO: Clear support for *both* standalone and embeds
@@ -143,6 +147,12 @@ def pelican_init(pelican_object):
     global TWEET_FALLBACK_DICT
     global TWEET_FALLBACK_MATCH
 
+    global TWEET_RECURSE_THREADS
+    global TWEET_RECURSE_QRTS
+
+    TWEET_RECURSE_THREADS = pelican_object.settings.get('TWEET_RECURSE_THREADS', True)
+    TWEET_RECURSE_QRTS = pelican_object.settings.get('TWEET_RECURSE_QRTS', True)
+
     TWEET_FALLBACK_ON = pelican_object.settings.get('TWEET_FALLBACK_ON', False)
     TWEET_FALLBACK_MATCH = pelican_object.settings.get(
         'TWEET_FALLBACK_MATCH', 
@@ -196,7 +206,7 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
         try:
             tweet_json = getTweetJson(username, tweet_id)
         except TweepError as e:
-            logging.error(f"Can't load tweet {username}/{tweet_id}: '{e}'")
+            logging.error(f"Can't load tweet {username}/status/{tweet_id}: '{e}'")
             reason = e.response.text
             if e.response.status_code == 144:
                 reason = "Tweet has been deleted"
@@ -239,6 +249,7 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
 
 class PelicanTweetEmbedMdExtension(markdown.Extension):
     def extendMarkdown(self, md):
+        logging.debug("Registering tweet_embed markdown pattern")
         md.inlinePatterns.register(TweetEmbedProcessor(markdown.inlinepatterns.IMAGE_LINK_RE, md), 'tweet_embed', 200)
 
 
@@ -291,6 +302,15 @@ def getTweetJson(username, tweet_id):
             os.makedirs(dest_dir, exist_ok=True)
             with open(dest_path, "w") as fp:
                 json.dump(status._json, fp, indent=2)
+
+            if TWEET_RECURSE_THREADS and status._json.get("in_reply_to_screen_name"):
+                logging.info("Also downloading replied-to tweet " + status._json['in_reply_to_status_id_str'])
+                getTweetJson(status._json['in_reply_to_screen_name'], status._json['in_reply_to_status_id_str'])
+            
+            if TWEET_RECURSE_QRTS and status._json.get("quoted_status"):
+                logging.info("Also downloading quoted tweet " + status._json.get("quoted_status")['id_str'])
+                getTweetJson(status._json.get("quoted_status")['user']['screen_name'], status._json.get("quoted_status")['id'])
+
             return status._json
 
         except (TweepError, AssertionError) as e:
@@ -365,6 +385,21 @@ def replaceBlanksInFile(filepath):
 
 if __name__ == "__main__":
     import sys
+
+    tweepy_config_path = os.path.abspath("./tweepy_config.py")
+    sys.path.insert(0, os.path.dirname(tweepy_config_path))
+    try:
+        import tweepy_config
+        auth = tweepy.OAuthHandler(tweepy_config.TWEEPY_CONSUMER_KEY, tweepy_config.TWEEPY_CONSUMER_SECRET)
+        auth.set_access_token(tweepy_config.TWEEPY_ACCESS_TOKEN, tweepy_config.TWEEPY_ACCESS_TOKEN_SECRET)
+        api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
+        logging.info("Logged in to twitter via Tweepy")
+
+    except ImportError:
+        logging.warning("Couldn't import , won't have internet functionality!", exc_info=True)
+    except:
+        logging.info("Tweepy not configured; using local tweets only.")
+
     for globstr in sys.argv[1:]:
         for filepath in glob.glob(globstr, recursive=True):
             replaceBlanksInFile(filepath)
