@@ -5,9 +5,13 @@ from bs4 import BeautifulSoup
 from pelican import signals
 from pelican.generators import ArticlesGenerator, PagesGenerator, TemplatePagesGenerator
 
+import threading
+import queue
+
+MAX_THREADS = 10
 RENDERDEPS_USE_SOUP_DEFAULT = True
 
-def process_content(article, generator=None):
+def process_dependencies(article, generator=None):
     """
     Pelican callback
     """
@@ -64,6 +68,22 @@ def link_source_files(generator):
 def add_deps(generators):
     # Process the articles and pages
 
+    q = queue.Queue()
+
+    class Worker(threading.Thread):
+        def __init__(self, fn, *args, **kwargs):
+            self.fn = fn
+            super().__init__(*args, **kwargs)
+
+        def run(self):
+            while True:
+                try:
+                    work = q.get(timeout=3)  # 3s timeout
+                except queue.Empty:
+                    return
+                self.fn(*work)
+                q.task_done()
+
     document_generators = [ArticlesGenerator, PagesGenerator, TemplatePagesGenerator]
 
     for generator in generators:
@@ -74,10 +94,14 @@ def add_deps(generators):
                 if getattr(generator, attr, None)
             ], [])
             for document in documents:
-                process_content(document, generator)
+                work = (document, generator)
+                q.put_nowait(work)
         else:
             logging.debug(f"Renderdeps: Unhandled generator {generator}")
 
+    for _ in range(MAX_THREADS):
+        Worker(process_dependencies).start()
+    q.join()  # blocks until the queue is empty.
 
 def register():
     signals.all_generators_finalized.connect(add_deps)
