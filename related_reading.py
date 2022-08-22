@@ -108,7 +108,7 @@ class RelatedReadingAggregateGenerator(CachingGenerator):
 
         page_url = '.'
         if page.url:
-            page_url = page.url # if self.relative_urls else (self.siteurl + '/' + page.url)
+            page_url = page.url  # if self.relative_urls else (self.siteurl + '/' + page.url)
 
         node = {
             'title': page_title,
