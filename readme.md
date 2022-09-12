@@ -8,9 +8,9 @@ Adds chonologically sorted versions of tag, category, and author index pages wit
 
 On tumblr, you can can browse a blog's tag in either order: chronological order or latest-first. The URL schemes look like this:
 
-Default: `https://{blog}.tumblr.com/tagged/{tag}/page/{i}``
+Default: `https://{blog}.tumblr.com/tagged/{tag}/page/{i}`
 
-Chrono: `https://{blog}.tumblr.com/tagged/{tag}/chrono/page/{i}``
+Chrono: `https://{blog}.tumblr.com/tagged/{tag}/chrono/page/{i}`
 
 This adds a generator with a similar effect.
 
@@ -239,3 +239,7 @@ There are no options to configure.
 This one is very much tailored to my blog specifically, but it might be useful as a template. 
 
 Gathers up all the links classed `.related_reading` in all the articles and creates an aggregate page.
+
+## Hash drafts
+
+This adds a generator that renders drafts with a crc32 "hash" of their content appended to the slug, so you can share links to specific versions of drafts.
