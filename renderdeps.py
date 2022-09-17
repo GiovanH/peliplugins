@@ -31,8 +31,9 @@ def process_dependencies(article, generator=None):
 
     for (args, kwargs), dep in dependencies:
         # logging.debug(f"Checking for '{args} {kwargs}'")
-        if soup.find(*args, **kwargs):
-            logging.info("Inserting dependency " + repr(dep) + " into " + repr(article.slug))
+
+        if match := soup.find(*args, **kwargs):
+            logging.info("Inserting dependency " + repr(dep) + " into " + repr(article.slug) + " matching" + repr(match))
             if use_soup:
                 soup.append(BeautifulSoup(dep, 'html.parser'))
                 dirty = True
