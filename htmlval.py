@@ -43,7 +43,7 @@ def process_content(instance, generator=None):
                 else:
                     issues.append(f"Unsummarized article length is {len(instance.summary)}/{SUMMARY_MAX_LENGTH}")
                     if instance.has_summary:
-                        issues.append(f"Article incorrectly has 'has_summary' ste to True!")
+                        issues.append(f"Article incorrectly has 'has_summary' set to True!")
 
         else:
             issues.append(f"Missing summary")
