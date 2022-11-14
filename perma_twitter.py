@@ -80,10 +80,13 @@ api = None
 def get_real_src_url(media_entry):
     if media_entry['type'] == "photo":
         return html.escape(media_entry['media_url_https'])
-    elif media_entry['type'] == "video":
-        return html.escape(media_entry['video_info']['variants'][0]['url'])
-    elif media_entry['type'] == "animated_gif":
-        return html.escape(media_entry['video_info']['variants'][0]['url'])
+
+    elif media_entry['type'] == "video" or media_entry['type'] == "animated_gif":
+        best = next(filter(
+            lambda v: '.m3u8' not in v['url'].split('/')[-1],
+            media_entry['video_info']['variants']
+        ))
+        return html.escape(best['url'])
     else:
         raise NotImplementedError(media_entry['type'])
 
@@ -325,6 +328,7 @@ def getTweetJson(username, tweet_id, get_media=False):
 
                 except Exception as e:
                     print(f"Media error {json_obj['id']!r}: {e}")
+                    open(media_dest_path, 'wb') # touch file
 
             return json_obj
 
