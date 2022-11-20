@@ -55,7 +55,13 @@ def cb_imessage(ctx, name=None, image=None, *args, **kwargs):
     #         l2.append(message_elem)
     for root in body_etree.findall('ul'):
         for author_group in root.findall('li'):
-            author_group.set('data-author', author_group.text.lower())
+            author = author_group.text
+            lowered = author.lower()
+            author_group.set('data-author', lowered)
+            if lowered not in ['you', 'them']:
+                author_group.insert(0,
+                    cbE('span', {'class': 'author'}, author)
+                )
             author_group.text = ''
 
     return body_etree
