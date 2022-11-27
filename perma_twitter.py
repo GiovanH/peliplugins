@@ -5,7 +5,7 @@ import markdown
 import os
 import re
 import tweepy
-from tweepy.error import TweepError
+from tweepy.errors import TweepyException
 import xml.etree.ElementTree as ET
 import html
 import shutil
@@ -195,7 +195,7 @@ def pelican_init(pelican_object):
         assert consumer_key
         auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
         auth.set_access_token(access_token, access_token_secret)
-        api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
+        api = tweepy.API(auth, wait_on_rate_limit=True)
         logging.info("Logged in to twitter via Tweepy")
     except:
         logging.info("Tweepy not configured; using local tweets only.")
@@ -222,7 +222,7 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
 
         try:
             tweet_json = getTweetJson(username, tweet_id, get_media=True)
-        except TweepError as e:
+        except TweepyException as e:
             logging.error(f"Can't load tweet {username}/status/{tweet_id}: '{e}'")
             reason = e.response.text
             if e.response.status_code == 144:
@@ -370,7 +370,7 @@ def getTweetJson(username, tweet_id, get_media=False):
 
             return status._json
 
-        except (TweepError, AssertionError) as e:
+        except (TweepyException, AssertionError) as e:
             # logging.error(f"Can't load tweet {username}/{tweet_id}: '{e}'")
             if TWEET_FALLBACK_ON:
                 try:
@@ -449,12 +449,14 @@ if __name__ == "__main__":
         import tweepy_config
         auth = tweepy.OAuthHandler(tweepy_config.TWEEPY_CONSUMER_KEY, tweepy_config.TWEEPY_CONSUMER_SECRET)
         auth.set_access_token(tweepy_config.TWEEPY_ACCESS_TOKEN, tweepy_config.TWEEPY_ACCESS_TOKEN_SECRET)
-        api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
+        api = tweepy.API(auth, wait_on_rate_limit=True)
         logging.info("Logged in to twitter via Tweepy")
 
     except ImportError:
         logging.warning("Couldn't import , won't have internet functionality!", exc_info=True)
     except:
+        import traceback
+        traceback.print_exc()
         logging.info("Tweepy not configured; using local tweets only.")
 
     for globstr in sys.argv[1:]:
