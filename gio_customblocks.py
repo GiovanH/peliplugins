@@ -5,8 +5,12 @@ from customblocks.utils import E as cbE
 def cb_aside(ctx, title=None, *args, **kwargs):
     slugargs = ['-'.join(arg.split()) for arg in args]
     return cbE(
-        f"aside.{title}",
+        f"aside.cb.{title}",
         {'_class': ' '.join(slugargs)},
+        cbE(f"div", {'class': 'aside-header'},
+            cbE(f"span", {'class': 'icon'}),
+            cbE(f"span", {'class': 'type'}),
+        ),
         cbMarkdown(ctx.content, ctx.parser),
         **kwargs
     )

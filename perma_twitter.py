@@ -54,7 +54,7 @@ TWEET_TEMPLATE_STR = re.sub(r'\n +', '', """<blockquote class="twitter-tweet" da
         {% endif %}
         <a href="https://twitter.com/{{ user.screen_name }}/" title="{{ user.description|replace("\n", " ") }}">
             <img src="{{ user.profile_image_url_https }}"
-                onerror="this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;"
+                onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;})();"
             ></img>
             <div class="vertical">
                 <span class="name">{{ user.name }}</span>
@@ -103,7 +103,7 @@ def tw_entities(text, id, entities, extended_entities):
             if e['type'] == "photo":
                 repl = f"""<a href="{e['expanded_url']}" target="_blank">
     <img class="img count{media_count}" src="{get_real_src_url(e)}"
-        onerror="this.onerror=null;this.src=`https://web.archive.org/web/0/${{this.src}}`;"
+         """+"""onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;\})();"
     ></img>
 </a>"""
             elif e['type'] == "video":

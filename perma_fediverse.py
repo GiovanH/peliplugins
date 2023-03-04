@@ -40,7 +40,7 @@ TOOT_TEMPLATE_STR = re.sub(r'\n +', '', """<blockquote class="fediverse-toot" da
     {% autoescape true %}
         <a href="{{ account.url }}"title="{{ profile_summary|replace("\n", " ") }}">
             <img src="{{ account.avatar_static }}"
-                onerror="this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;"
+                onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;})();"
             ></img>
             <div class="vertical">
                 <span class="name">{{ account.display_name }}</span>
@@ -59,7 +59,7 @@ TOOT_TEMPLATE_STR = re.sub(r'\n +', '', """<blockquote class="fediverse-toot" da
     {% for media in media_attachments %}
     <a href="{{ uri }}" data-href-orig="{{ media.url }}" target="_blank">
         <img class="img count{{ media_attachments|length }}"
-            onerror="this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;"
+                onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;})();"
             src="{{ media.preview_url }}"
         ></img>
     </a>
@@ -209,7 +209,7 @@ class TootEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
         #     return ET.fromstring(f"<p>Couldn't find tweet <a href='{href}'>'{title or tweet_id}'</a> ({reason})</p>"), m.start(0), index
 
         except:
-            logging.error("Can't load toot " + toot_id, exc_info=True)
+            logging.error("Can't load toot %s %s %s", (instance, username, toot_id), exc_info=True)
             return ET.fromstring(f"<p>ERROR! Can't load toot <a href='{href}'>'{title}'</a></p>"), m.start(0), index
 
         # try:
@@ -308,11 +308,11 @@ def getTootJson(instance, username, toot_id, get_media=False):
                         if not os.path.isfile(media_dest_path):
                             print("DOWN", src, '->', media_dest_path)
                             urlretrieve(src, media_dest_path)
-                        else:
-                            print("SKIP", src, '->', media_dest_path)
+                        # else:
+                        #     print("SKIP", src, '->', media_dest_path)
 
                 except Exception as e:
-                    print(f"Media error {status_json.get('id')!r}: {e}")
+                    print(f"Media error {json_obj.get('id')!r}: {e}")
                     # open(media_dest_path, 'wb')  # touch file
 
             return json_obj
@@ -336,10 +336,10 @@ def getTootJson(instance, username, toot_id, get_media=False):
 
             if TOOT_DOWNLOAD_IMAGES and get_media and status_json.get("media_attachments"):
                 try:
-                    for media in json_obj["media_attachments"]:
+                    for media in status_json["media_attachments"]:
                         src = get_real_src_url(media)
                         __, mname = os.path.split(src)
-                        media_dest_path = os.path.join(dest_dir, f"s{json_obj['id']}-{mname}")
+                        media_dest_path = os.path.join(dest_dir, f"s{status_json['id']}-{mname}")
                         if not os.path.isfile(media_dest_path):
                             print("DOWN", src, '->', media_dest_path)
                             urlretrieve(src, media_dest_path)
