@@ -12,6 +12,7 @@ import shutil
 import glob
 import urllib.parse
 import urllib.request
+import requests
 
 from jinja2 import Environment
 # from pelican import generators
@@ -19,7 +20,8 @@ from pelican import signals
 
 TWEETLINK_RE = r"(https|http)://(www.){0,1}twitter\.com/([^/]+)/status/(\d+).*?"
 TWEETEMBED_NOTITLE_RE = r"(?<=\!\[\]\()" + TWEETLINK_RE + r"(?=\))"
-        
+
+NITTR_HOST = None
 
 TWEET_FALLBACK_GLOB = None
 TWEET_FALLBACK_ON = False
@@ -67,7 +69,7 @@ TWEET_TEMPLATE_STR = re.sub(r'\n +', '', """<blockquote class="twitter-tweet" da
         {% if in_reply_to_status_id %}
             <span class="replyto">Replying to <a class="prev" href="https://twitter.com/{{in_reply_to_screen_name}}/status/{{ in_reply_to_status_id }}">{{in_reply_to_screen_name}}</a>:</span>
         {% endif %}
-        <p>{{ full_text|e|replace("\n\n", "</p><p>")|replace("\n", "</p><p>")|tw_stripents(id, entities, extended_entities or {})|replace("&amp;", "&") }}</p>
+        <p>{{ full_text|e|replace("\n\n", "</p><p>")|replace("\n", "</p><p>")|tw_stripents(id, entities, extended_entities or {})|replace("&amp;", "&")|replace("&amp;", "&") }}</p>
     </div>
     <div class="media" style="display: none;">{{ full_text|e|tw_entities(id, entities, extended_entities or {}) }}</div>
     <a href="https://twitter.com/{{ user.screen_name }}/status/{{ id }}" target="_blank">{{ created_at }}</a>
@@ -76,6 +78,7 @@ TWEET_TEMPLATE_STR = re.sub(r'\n +', '', """<blockquote class="twitter-tweet" da
 # <!-- {% if not md_title %}!{% endif %}[{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }}) -->
 
 api = None
+
 
 def get_real_src_url(media_entry):
     if media_entry['type'] == "photo":
@@ -90,6 +93,7 @@ def get_real_src_url(media_entry):
     else:
         raise NotImplementedError(media_entry['type'])
 
+
 def tw_entities(text, id, entities, extended_entities):
     entities.update(extended_entities)
 
@@ -103,7 +107,7 @@ def tw_entities(text, id, entities, extended_entities):
             if e['type'] == "photo":
                 repl = f"""<a href="{e['expanded_url']}" target="_blank">
     <img class="img count{media_count}" src="{get_real_src_url(e)}"
-         """+"""onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;\})();"
+         """ + """onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;\})();"
     ></img>
 </a>"""
             elif e['type'] == "video":
@@ -121,6 +125,7 @@ def tw_entities(text, id, entities, extended_entities):
 
     return text
 
+
 def tw_stripents(text, id, entities, extended_entities):
     entities.update(extended_entities)
 
@@ -136,7 +141,7 @@ def tw_stripents(text, id, entities, extended_entities):
         text = text.replace(find, repl)
 
     for e in entities.get('media', []):
-        find = e['url'] 
+        find = e['url']
         text = text.replace(find, "")
 
     return text
@@ -148,6 +153,7 @@ env.filters['tw_entities'] = tw_entities
 env.filters['tw_stripents'] = tw_stripents
 
 TWEET_TEMPLATE = env.from_string(TWEET_TEMPLATE_STR)
+
 
 def pelican_init(pelican_object):
     consumer_key = pelican_object.settings.get('TWEEPY_CONSUMER_KEY')
@@ -165,6 +171,8 @@ def pelican_init(pelican_object):
     global TWEET_DOWNLOAD_IMAGE_BACKLOG
     global TWEET_DOWNLOAD_IMAGES
 
+    global NITTR_HOST
+
     TWEET_RECURSE_THREADS = pelican_object.settings.get('TWEET_RECURSE_THREADS', TWEET_RECURSE_THREADS)
     TWEET_RECURSE_QRTS = pelican_object.settings.get('TWEET_RECURSE_QRTS', TWEET_RECURSE_QRTS)
     TWEET_DOWNLOAD_IMAGE_BACKLOG = pelican_object.settings.get('TWEET_DOWNLOAD_IMAGE_BACKLOG', TWEET_DOWNLOAD_IMAGE_BACKLOG)
@@ -172,9 +180,11 @@ def pelican_init(pelican_object):
 
     TWEET_FALLBACK_ON = pelican_object.settings.get('TWEET_FALLBACK_ON', TWEET_FALLBACK_ON)
     TWEET_FALLBACK_MATCH = pelican_object.settings.get(
-        'TWEET_FALLBACK_MATCH', 
+        'TWEET_FALLBACK_MATCH',
         lambda path: re.match(r".*s(\d+)\.json", path).groups(1)
     )
+
+    NITTR_HOST = pelican_object.settings.get('NITTR_HOST', NITTR_HOST)
 
     if TWEET_FALLBACK_ON:
         TWEET_FALLBACK_GLOB = pelican_object.settings['TWEET_FALLBACK_GLOB']
@@ -189,7 +199,7 @@ def pelican_init(pelican_object):
             TWEET_FALLBACK_MATCH(path): path
             for path in glob.glob(TWEET_FALLBACK_GLOB, recursive=True)
         }
-        
+
     global api
     try:
         assert consumer_key
@@ -273,6 +283,7 @@ class PelicanTweetEmbedMdExtension(markdown.Extension):
         # logging.debug("Registering tweet_embed markdown pattern")
         md.inlinePatterns.register(TweetEmbedProcessor(markdown.inlinepatterns.IMAGE_LINK_RE, md), 'tweet_embed', 200)
 
+
 def urlretrieve(src, dest):
     try:
         return urllib.request.urlretrieve(src, dest)
@@ -281,6 +292,31 @@ def urlretrieve(src, dest):
             return urllib.request.urlretrieve('https://web.archive.org/web/0im_/' + src, dest)
         except:
             raise e
+
+
+def ensureTweetComplete(json_obj):
+    full_text = json_obj.get('full_text') or json_obj.get('text')
+    has_note = ('… https://t.co/' in full_text) and (
+        any(
+            (url['expanded_url'] == f"https://twitter.com/i/web/status/{json_obj['id']}")
+            for url in e['urls']
+        )
+        for e in json_obj['entities']
+    )
+    if has_note and not json_obj.get('full_text_orig'):
+        if NITTR_HOST:
+            import requests
+            import bs4
+            resp = requests.get('/'.join([NITTR_HOST, json_obj['user']['screen_name'], 'status', json_obj['id_str']]))
+            resp.raise_for_status()
+            soup = bs4.BeautifulSoup(resp.text, features="lxml")
+            note_tweet = soup.select('.tweet-content.media-body')[0].contents[0]
+            json_obj['full_text_orig'] = json_obj['full_text']
+            json_obj['full_text'] = note_tweet
+        else:
+            raise NotImplementedError("Tweet needs note_tweet saved, but no NITTR_HOST set!")
+    return json_obj
+
 
 def getTweetJson(username, tweet_id, get_media=False):
     tweet_id = str(tweet_id)
@@ -321,19 +357,19 @@ def getTweetJson(username, tweet_id, get_media=False):
                         __, mname = os.path.split(src)
                         media_dest_path = os.path.join(dest_dir, f"s{json_obj['id']}-{mname}")
                         if not os.path.isfile(media_dest_path):
-                            print("DOWN", src, '->', media_dest_path)
+                            print("DL", src, '->', media_dest_path)
                             urlretrieve(src, media_dest_path)
                         # else:
                         #     print("SKIP", src, '->', media_dest_path)
 
                 except Exception as e:
                     print(f"Media error {json_obj['id']!r}: {e}")
-                    open(media_dest_path, 'wb') # touch file
+                    open(media_dest_path, 'wb')  # touch file
 
-            return json_obj
+            return ensureTweetComplete(json_obj)
 
-    except FileNotFoundError:
-        # No file yet
+    except (FileNotFoundError, KeyError):
+        # No file yet, or file missing required keys
         # logging.warning("Not seeing cached tweet for id " + tweet_id)
         # raise
 
@@ -344,13 +380,15 @@ def getTweetJson(username, tweet_id, get_media=False):
             status = api.get_status(tweet_id, tweet_mode='extended')
             logging.info("Downloaded new tweet for id " + tweet_id)
 
+            json_obj = ensureTweetComplete(status._json)
+
             os.makedirs(dest_dir, exist_ok=True)
             with open(dest_path, "w") as fp:
-                json.dump(status._json, fp, indent=2)
+                json.dump(json_obj, fp, indent=2)
 
             if TWEET_DOWNLOAD_IMAGES and get_media and status.entities.get("media"):
                 try:
-                    for media in status._json["entities"]["media"]:
+                    for media in json_obj["entities"]["media"]:
                         src = get_real_src_url(media)
                         __, mname = os.path.split(src)
                         media_dest_path = os.path.join(dest_dir, f"s{status.id}-{mname}")
@@ -360,15 +398,15 @@ def getTweetJson(username, tweet_id, get_media=False):
                 except Exception as e:
                     print(f"Media error {status.id!r}: {e}")
 
-            if TWEET_RECURSE_THREADS and status._json.get("in_reply_to_status_id_str"):
-                logging.info("Also downloading replied-to tweet " + status._json['in_reply_to_status_id_str'])
-                getTweetJson(status._json['in_reply_to_screen_name'], status._json['in_reply_to_status_id_str'])
-            
-            if TWEET_RECURSE_QRTS and status._json.get("quoted_status"):
-                logging.info("Also downloading quoted tweet " + status._json.get("quoted_status")['id_str'])
-                getTweetJson(status._json.get("quoted_status")['user']['screen_name'], status._json.get("quoted_status")['id'])
+            if TWEET_RECURSE_THREADS and json_obj.get("in_reply_to_status_id_str"):
+                logging.info("Also downloading replied-to tweet " + json_obj['in_reply_to_status_id_str'])
+                getTweetJson(json_obj['in_reply_to_screen_name'], json_obj['in_reply_to_status_id_str'])
 
-            return status._json
+            if TWEET_RECURSE_QRTS and json_obj.get("quoted_status"):
+                logging.info("Also downloading quoted tweet " + json_obj.get("quoted_status")['id_str'])
+                getTweetJson(json_obj.get("quoted_status")['user']['screen_name'], status._json.get("quoted_status")['id'])
+
+            return json_obj
 
         except (TweepyException, AssertionError) as e:
             # logging.error(f"Can't load tweet {username}/{tweet_id}: '{e}'")
@@ -383,6 +421,7 @@ def getTweetJson(username, tweet_id, get_media=False):
         except Exception:
             logging.error(f"Can't retrieve tweet with id '{tweet_id}'", exc_info=1)
             raise
+
 
 def getTweetJsonFallback(username, tweet_id, **kwargs):
     tweet_id = str(tweet_id)
@@ -412,14 +451,16 @@ def register():
     """Plugin registration"""
     signals.initialized.connect(pelican_init)
 
+
 TWEET_EMBED_TEMPLATE = env.from_string("""{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }}""")
+
 
 def replaceBlanksInFile(filepath, replace_only_uncaptioned=True):
     with open(filepath, "r", encoding="utf-8") as fp:
         body = fp.read()
 
     dirty = False
-    for match in re.finditer(TWEETEMBED_NOTITLE_RE, body):
+    for match in re.finditer(TWEETEMBED_NOTITLE_RE if replace_only_uncaptioned else TWEETLINK_RE, body):
         force_uncaptioned_prefix = "![" if replace_only_uncaptioned else ""
         try:
             http, www, username, tweet_id = match.groups()
@@ -434,11 +475,11 @@ def replaceBlanksInFile(filepath, replace_only_uncaptioned=True):
         except Exception as e:
             logging.error(e)
             logging.warning(f"{filepath}: Couldn't get tweet \n\t{match.group()}")
-    
+
     if dirty:
         with open(filepath, "w", encoding="utf-8") as fp:
             fp.write(body)
-    
+
 
 if __name__ == "__main__":
     import sys
@@ -458,6 +499,10 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         logging.info("Tweepy not configured; using local tweets only.")
+
+    # NITTR_HOST already global here
+    if hasattr(tweepy_config, 'NITTR_HOST'):
+        NITTR_HOST = tweepy_config.NITTR_HOST
 
     for globstr in sys.argv[1:]:
         for filepath in glob.glob(globstr, recursive=True):

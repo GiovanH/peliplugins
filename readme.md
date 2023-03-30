@@ -123,6 +123,14 @@ TWEEPY_ACCESS_TOKEN_SECRET = ""
 
 (Import them from another file for an extra layer of security.)
 
+Optional configuration:
+
+```python
+NITTR_HOST = ""
+```
+
+Set a root url of a Nittr instance in order to fetch full text of "note" posts. Optional
+
 ### Usage
 
 Embed tweets as images with any label, but a twitter link instead of an image source.
