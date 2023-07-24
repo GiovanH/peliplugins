@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import ujson as json
 import logging
 import markdown
 import os
@@ -14,6 +13,11 @@ import urllib.parse
 import urllib.request
 import requests
 import functools
+
+try:
+    import ujson as json
+except ImportError:
+    import json
 
 from jinja2 import Environment
 # from pelican import generators
@@ -78,12 +82,11 @@ TWEET_TEMPLATE_STR = re.sub(r'\n +', '', """<blockquote class="twitter-tweet" da
 
 # <!-- {% if not md_title %}!{% endif %}[{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }}) -->
 
-api = None
-
-
 def get_real_src_url(media_entry):
     if media_entry['type'] == "photo":
         return html.escape(media_entry['media_url_https'])
+    if media_entry['type'] == "hls":
+        return media_entry['media_url_https']
 
     elif media_entry['type'] == "video" or media_entry['type'] == "animated_gif":
         best = next(filter(
@@ -111,7 +114,7 @@ def tw_entities(text, id, entities, extended_entities):
          """ + """onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;\})();"
     ></img>
 </a>"""
-            elif e['type'] == "video":
+            elif e['type'] == "video" or e['type'] == "hls":
                 repl = f"""<video src="{get_real_src_url(e)}" controls="true"></video>"""
             elif e['type'] == "animated_gif":
                 repl = f"""<video src="{get_real_src_url(e)}" loop="true" playsinline="true" controls="true" preload="auto"></video>"""
@@ -150,6 +153,24 @@ def tw_stripents(text, id, entities, extended_entities):
     return text
 
 
+api = None
+
+def getApi():
+    global api
+    if api:
+        return api
+
+    assert BSKY_PASSWD
+
+    assert consumer_key
+    auth = tweepy.OAuthHandler(TWEEPY_CONSUMER_KEY, TWEEPY_CONSUMER_SECRET)
+    auth.set_access_token(TWEEPY_ACCESS_TOKEN, TWEEPY_ACCESS_TOKEN_SECRET)
+    api = tweepy.API(auth, wait_on_rate_limit=True)
+    logging.info("Logged in to twitter via Tweepy")
+
+    return api
+
+
 env = Environment()
 
 env.filters['tw_entities'] = tw_entities
@@ -159,10 +180,14 @@ TWEET_TEMPLATE = env.from_string(TWEET_TEMPLATE_STR)
 
 
 def pelican_init(pelican_object):
-    consumer_key = pelican_object.settings.get('TWEEPY_CONSUMER_KEY')
-    consumer_secret = pelican_object.settings.get('TWEEPY_CONSUMER_SECRET')
-    access_token = pelican_object.settings.get('TWEEPY_ACCESS_TOKEN')
-    access_token_secret = pelican_object.settings.get('TWEEPY_ACCESS_TOKEN_SECRET')
+    global TWEEPY_CONSUMER_KEY
+    global TWEEPY_CONSUMER_SECRET
+    global TWEEPY_ACCESS_TOKEN
+    global TWEEPY_ACCESS_TOKEN_SECRET
+    TWEEPY_CONSUMER_KEY = pelican_object.settings.get('TWEEPY_CONSUMER_KEY')
+    TWEEPY_CONSUMER_SECRET = pelican_object.settings.get('TWEEPY_CONSUMER_SECRET')
+    TWEEPY_ACCESS_TOKEN = pelican_object.settings.get('TWEEPY_ACCESS_TOKEN')
+    TWEEPY_ACCESS_TOKEN_SECRET = pelican_object.settings.get('TWEEPY_ACCESS_TOKEN_SECRET')
 
     global TWEET_FALLBACK_GLOB
     global TWEET_FALLBACK_ON
@@ -203,20 +228,24 @@ def pelican_init(pelican_object):
             for path in glob.glob(TWEET_FALLBACK_GLOB, recursive=True)
         }
 
-    global api
-    try:
-        assert consumer_key
-        auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-        auth.set_access_token(access_token, access_token_secret)
-        api = tweepy.API(auth, wait_on_rate_limit=True)
-        logging.info("Logged in to twitter via Tweepy")
-    except:
-        logging.info("Tweepy not configured; using local tweets only.")
-
     os.makedirs("tweets", exist_ok=True)
 
     pelican_object.settings['MARKDOWN'].setdefault('extensions', []).append(PelicanTweetEmbedMdExtension())
 
+# def x_generator_write_x(generator, content):
+#     repl = markdown.markdown(
+#         content._content,
+#         extensions=[PelicanTweetEmbedMdExtension()]
+#     )
+#     import difflib
+#     import sys
+#     sys.stdout.writelines(difflib.unified_diff(
+#         content._content.splitlines(keepends=True),
+#         repl.splitlines(keepends=True),
+#         fromfile=f'{content.slug}-before.md',
+#         tofile=f'{content.slug}-after.md'
+#     ))
+#     content._content = repl
 
 class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
     """ Return a img element from the given match. """
@@ -307,7 +336,10 @@ def urlretrieve(src, dest):
 
 def ensureTweetComplete(json_obj, path_if_changed=None):
     # global dest_path
-    full_text = json_obj.get('full_text') or json_obj.get('text')
+    # Text may be an empty string
+    full_text = json_obj.get('full_text')  # or json_obj.get('text')
+    if full_text is None:
+        full_text = json_obj.get('text')
     has_note = ('… https://t.co/' in full_text) and (
         any(
             (url['expanded_url'] == f"https://twitter.com/i/web/status/{json_obj['id']}")
@@ -395,7 +427,7 @@ def getTweetJson(username, tweet_id, get_media=False, reason=""):
 
                 return ensureTweetComplete(json_obj, path_if_changed=dest_path)
 
-        except (FileNotFoundError, KeyError, json.decoder.JSONDecodeError):
+        except (FileNotFoundError, KeyError): # , json.decoder.JSONDecodeError):
             # No file yet, or file missing required keys
             # logging.warning("Not seeing cached tweet for id " + tweet_id)
             # raise
@@ -453,6 +485,16 @@ def getTweetJson(username, tweet_id, get_media=False, reason=""):
                     src = get_real_src_url(media)
                     __, mname = os.path.split(src)
                     media_dest_path = os.path.join(dest_dir, f"s{json_obj['id']}-{mname}")
+                    if media['type'] == "hls":
+                        print("DL HLS", src, '->', media_dest_path)
+                        import subprocess
+                        subprocess.run([
+                            'yt-dlp',
+                            src,
+                            '-o',
+                            media_dest_path
+                        ])
+                        continue
                     if not os.path.isfile(media_dest_path):
                         urlretrieve(src, media_dest_path)
 
@@ -470,7 +512,11 @@ def getTweetJsonNittr(username, tweet_id):
 
         nittr_url = '/'.join([NITTR_HOST, username, 'status', tweet_id])
 
-        resp = requests.get(nittr_url, headers={'User-Agent': 'curl/8.0.1'})
+        resp = requests.get(
+            nittr_url,
+            headers={'User-Agent': 'curl/8.0.1'},
+            cookies={'hlsPlayback': 'on'}
+        )
         resp.raise_for_status()
         # with open("temp.pickle", 'wb') as fp:
         #     pickle.dump(resp.text, fp)
@@ -522,6 +568,20 @@ def getTweetJsonNittr(username, tweet_id):
                     "media_url": href,
                     "media_url_https": href
                 })
+
+            for media_el in tweet_el.select(".attachments video"):
+                try:
+                    # print(media_el)
+                    href = urllib.parse.urljoin(NITTR_HOST, media_el['data-url'])
+                    # print(href)
+                    json_obj['entities']['media'].append({
+                        "type": "hls",
+                        "expanded_url": href,
+                        "media_url": href,
+                        "media_url_https": href
+                    })
+                except KeyError:
+                    continue  # no data-url
         # except IndexError:
         #     logging.error(exc_info=True)
 
@@ -581,6 +641,8 @@ def getTweetJsonFileFallback(username, tweet_id, **kwargs):
 def register():
     """Plugin registration"""
     signals.initialized.connect(pelican_init)
+    # signals.article_generator_write_article.connect(x_generator_write_x)
+    # signals.page_generator_write_page.connect(x_generator_write_x)
 
 
 TWEET_EMBED_TEMPLATE = env.from_string("""{{ user.screen_name }}: {{ full_text|e|replace("\n\n", " - ")|replace("\n", " - ") }}](https://twitter.com/{{ user.screen_name }}/status/{{ id }}""")

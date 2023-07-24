@@ -80,6 +80,8 @@ def get_real_src_url(media_entry):
         return html.escape(media_entry['url'])
     elif media_entry['type'] == "video":
         return html.escape(media_entry['url'])
+    elif media_entry['type'] == "gifv":
+        return html.escape(media_entry['url'])
 
     # elif media_entry['type'] == "video" or media_entry['type'] == "animated_gif":
     #     best = next(filter(
@@ -236,13 +238,14 @@ class TootEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
                 md_title=title,
                 instance=instance,
                 extra_attrs=extra_attrs,
-                profile_summary=summarize_html(toot_json.get('account', {}).get('note')),
+                profile_summary=summarize_html(toot_json.get('account', {}).get('note') or ""),
                 **toot_json
             )
             return self.md.htmlStash.store(string), m.start(0), index
-        except ET.ParseError as e:
+        except Exception as e:
             logging.error(string, exc_info=True)
-            raise e
+            return None, None, None
+            # raise e
 
     def getLink(self, data, index):
         href, title, index, handled = super().getLink(data, index)
