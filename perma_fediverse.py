@@ -78,6 +78,8 @@ def summarize_html(html_code):
 def get_real_src_url(media_entry):
     if media_entry['type'] == "image":
         return html.escape(media_entry['url'])
+    elif media_entry['type'] == "video":
+        return html.escape(media_entry['url'])
 
     # elif media_entry['type'] == "video" or media_entry['type'] == "animated_gif":
     #     best = next(filter(

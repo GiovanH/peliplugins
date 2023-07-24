@@ -13,6 +13,7 @@ import glob
 import urllib.parse
 import urllib.request
 import requests
+import functools
 
 from jinja2 import Environment
 # from pelican import generators
@@ -231,7 +232,7 @@ class TweetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
         #     logging.warning(f"Tweet {username}/{tweet_id} is missing its title!")
 
         try:
-            tweet_json = getTweetJson(username, tweet_id, get_media=True)
+            tweet_json = getTweetJson(username, tweet_id, get_media=True, reason=tweet_id)
         except TweepyException as e:
             logging.error(f"Can't load tweet {username}/status/{tweet_id}: '{e}'")
             reason = e.response.text
@@ -294,7 +295,8 @@ def urlretrieve(src, dest):
             raise e
 
 
-def ensureTweetComplete(json_obj):
+def ensureTweetComplete(json_obj, path_if_changed=None):
+    # global dest_path
     full_text = json_obj.get('full_text') or json_obj.get('text')
     has_note = ('… https://t.co/' in full_text) and (
         any(
@@ -305,14 +307,24 @@ def ensureTweetComplete(json_obj):
     )
     if has_note and not json_obj.get('full_text_orig'):
         if NITTR_HOST:
-            import requests
             import bs4
-            resp = requests.get('/'.join([NITTR_HOST, json_obj['user']['screen_name'], 'status', json_obj['id_str']]))
+            nittr_url = '/'.join([NITTR_HOST, json_obj['user']['screen_name'], 'status', json_obj['id_str']])
+            logging.warning(f"Using nittr to get full_text for {json_obj['id_str']} from {nittr_url=} b/c {json_obj.get('full_text_orig')=}")
+            # logging.warning(json_obj)
+            resp = requests.get(nittr_url, headers={'User-Agent': 'curl/8.0.1'})
             resp.raise_for_status()
             soup = bs4.BeautifulSoup(resp.text, features="lxml")
-            note_tweet = soup.select('.tweet-content.media-body')[0].contents[0]
-            json_obj['full_text_orig'] = json_obj['full_text']
-            json_obj['full_text'] = note_tweet
+            try:
+                note_tweet = soup.select('.tweet-content.media-body')[0].text
+                json_obj['full_text_orig'] = json_obj['full_text']
+                json_obj['full_text'] = str(note_tweet)
+                if path_if_changed:
+                    logging.warning(f"Resaving {path_if_changed} with added data")
+                    with open(path_if_changed, "w") as fp:
+                        json.dump(json_obj, fp, indent=2)
+            except IndexError:
+                logging.warning("Tweet did not have note? Check has_note logic")
+                logging.warning(soup.select('.tweet-content.media-body'))
         else:
             raise NotImplementedError("Tweet needs note_tweet saved, but no NITTR_HOST set!")
     return json_obj
@@ -464,7 +476,7 @@ def replaceBlanksInFile(filepath, replace_only_uncaptioned=True):
         force_uncaptioned_prefix = "![" if replace_only_uncaptioned else ""
         try:
             http, www, username, tweet_id = match.groups()
-            rendered = TWEET_EMBED_TEMPLATE.render(**getTweetJson(username, tweet_id, get_media=True))
+            rendered = TWEET_EMBED_TEMPLATE.render(**getTweetJson(username, tweet_id, get_media=True, reason=match))
             whole_md_object = force_uncaptioned_prefix + "](" + match.group(0)
 
             # logging.warning(f"{whole_md_object!r} -> {rendered!r}")
