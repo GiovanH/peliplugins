@@ -261,6 +261,10 @@ class PelicanFediverseEmbedMdExtension(markdown.Extension):
 
 def urlretrieve(src, dest):
     try:
+        opener = urllib.request.build_opener()
+        opener.addheaders = [('User-agent', 'curl/8.0.1')]
+        urllib.request.install_opener(opener)
+
         return urllib.request.urlretrieve(src, dest)
     except Exception as e:
         try:

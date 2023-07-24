@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import json
+import ujson as json
 import logging
 import markdown
 import os
@@ -106,7 +106,7 @@ def tw_entities(text, id, entities, extended_entities):
         media_count = len(media)
         for e in media:
             if e['type'] == "photo":
-                repl = f"""<a href="{e['expanded_url']}" target="_blank">
+                repl = f"""<a href="{e.get('expanded_url') or get_real_src_url(e)}" target="_blank">
     <img class="img count{media_count}" src="{get_real_src_url(e)}"
          """ + """onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;\})();"
     ></img>
@@ -131,19 +131,21 @@ def tw_stripents(text, id, entities, extended_entities):
     entities.update(extended_entities)
 
     for e in entities.get('urls', []):
-        find = e['url']
-        src = html.escape(e['expanded_url'])
-        repl = f"<a href='{src}' target='_blank'>{html.escape(e['display_url'])}</a>"
-        if DEBUG:
-            try:
-                ET.fromstring(repl)
-            except ET.ParseError:
-                logging.error(repl, exc_info=True)
-        text = text.replace(find, repl)
+        find = e.get('url')
+        if find:
+            src = html.escape(e.get('expanded_url') or get_real_src_url(e))
+            repl = f"<a href='{src}' target='_blank'>{html.escape(e['display_url'])}</a>"
+            if DEBUG:
+                try:
+                    ET.fromstring(repl)
+                except ET.ParseError:
+                    logging.error(repl, exc_info=True)
+            text = text.replace(find, repl)
 
     for e in entities.get('media', []):
-        find = e['url']
-        text = text.replace(find, "")
+        find = e.get('url')
+        if find:
+            text = text.replace(find, "")
 
     return text
 
@@ -410,7 +412,7 @@ def getTweetJson(username, tweet_id, get_media=False, reason=""):
 
     if not json_obj:
         try:
-            print("Fetching nittr", tweet_id)
+            # print("Fetching nittr", tweet_id)
             (json_obj, bonus_tweets) = getTweetJsonNittr(username, tweet_id)
             for json_obj_ex in bonus_tweets:
                 dest_dir_2 = os.path.join("tweets", json_obj_ex['user']['screen_name'])
@@ -501,6 +503,9 @@ def getTweetJsonNittr(username, tweet_id):
         # except IndexError:
         #     logging.warning("Could not get display name", exc_info=True)
 
+            json_obj['created_at'] = str(tweet_el.select('.tweet-date a[title]')[0]['title'])
+
+
         # try:
             json_obj['full_text'] = str(tweet_el.select('.tweet-content.media-body')[0].text)
         # except IndexError:
@@ -513,6 +518,7 @@ def getTweetJsonNittr(username, tweet_id):
                 # print(href)
                 json_obj['entities']['media'].append({
                     "type": "photo",
+                    "expanded_url": href,
                     "media_url": href,
                     "media_url_https": href
                 })
