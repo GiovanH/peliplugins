@@ -287,7 +287,15 @@ class PelicanTweetEmbedMdExtension(markdown.Extension):
 
 def urlretrieve(src, dest):
     try:
-        return urllib.request.urlretrieve(src, dest)
+        # return urllib.request.urlretrieve(src, dest)
+        # import urllib.request
+
+        opener = urllib.request.build_opener()
+        opener.addheaders = [('User-agent', 'curl/8.0.1')]
+        urllib.request.install_opener(opener)
+        urllib.request.urlretrieve(src, dest)
+        # resp = requests.get(src, headers={'User-Agent': 'curl/8.0.1'})
+
     except Exception as e:
         try:
             return urllib.request.urlretrieve('https://web.archive.org/web/0im_/' + src, dest)
@@ -329,11 +337,14 @@ def ensureTweetComplete(json_obj, path_if_changed=None):
             raise NotImplementedError("Tweet needs note_tweet saved, but no NITTR_HOST set!")
     return json_obj
 
-
-def getTweetJson(username, tweet_id, get_media=False):
+@functools.lru_cache()
+def getTweetJson(username, tweet_id, get_media=False, reason=""):
+    # global dest_path
     tweet_id = str(tweet_id)
     dest_dir = os.path.join("tweets", username)
     dest_path = os.path.join(dest_dir, f"s{tweet_id}.json")
+
+    json_obj = None
 
     if not os.path.isfile(dest_path):
         old_path = os.path.join("tweets", username[:3].lower(), username, f"s{tweet_id}.json")
@@ -351,91 +362,193 @@ def getTweetJson(username, tweet_id, get_media=False):
             # Handled in below try
             # raise FileNotFoundError(f"{username}, {tweet_id}")
 
-    try:
-        with open(dest_path, "r") as fp:
-            json_obj = json.load(fp)
-            # logging.debug("Found saved tweet data for " + tweet_id)
-
-            # Temporary: Passthrough to RT
-            startswith = json_obj.get("full_text", json_obj.get("text", '')).startswith("RT @")
-            if startswith and (rt_obj := json_obj.get("retweeted_status")):
-                rt_obj['retweeted_by'] = json_obj.get('user', {})
-                json_obj = rt_obj
-
-            if TWEET_DOWNLOAD_IMAGES and TWEET_DOWNLOAD_IMAGE_BACKLOG and json_obj.get("entities", {}).get("media"):
-                try:
-                    for media in json_obj["entities"]["media"]:
-                        src = get_real_src_url(media)
-                        __, mname = os.path.split(src)
-                        media_dest_path = os.path.join(dest_dir, f"s{json_obj['id']}-{mname}")
-                        if not os.path.isfile(media_dest_path):
-                            print("DL", src, '->', media_dest_path)
-                            urlretrieve(src, media_dest_path)
-                        # else:
-                        #     print("SKIP", src, '->', media_dest_path)
-
-                except Exception as e:
-                    print(f"Media error {json_obj['id']!r}: {e}")
-                    open(media_dest_path, 'wb')  # touch file
-
-            return ensureTweetComplete(json_obj)
-
-    except (FileNotFoundError, KeyError):
-        # No file yet, or file missing required keys
-        # logging.warning("Not seeing cached tweet for id " + tweet_id)
-        # raise
-
+    if not json_obj:
+        # Raw file open
         try:
-            if not api:
-                raise FileNotFoundError("API configuration must be passed in to use network functionality")
+            with open(dest_path, "r") as fp:
+                json_obj = json.load(fp)
+                # logging.debug("Found saved tweet data for " + tweet_id)
 
-            status = api.get_status(tweet_id, tweet_mode='extended')
-            logging.info("Downloaded new tweet for id " + tweet_id)
+                # Temporary: Passthrough to RT
+                startswith = json_obj.get("full_text", json_obj.get("text", '')).startswith("RT @")
+                if startswith and (rt_obj := json_obj.get("retweeted_status")):
+                    rt_obj['retweeted_by'] = json_obj.get('user', {})
+                    json_obj = rt_obj
 
-            json_obj = ensureTweetComplete(status._json)
+                if TWEET_DOWNLOAD_IMAGES and TWEET_DOWNLOAD_IMAGE_BACKLOG and json_obj.get("entities", {}).get("media"):
+                    try:
+                        for media in json_obj["entities"]["media"]:
+                            src = get_real_src_url(media)
+                            __, mname = os.path.split(src)
+                            media_dest_path = os.path.join(dest_dir, f"s{json_obj['id']}-{mname}")
+                            if not os.path.isfile(media_dest_path):
+                                print("DL", src, '->', media_dest_path)
+                                urlretrieve(src, media_dest_path)
+                            # else:
+                            #     print("SKIP", src, '->', media_dest_path)
 
-            os.makedirs(dest_dir, exist_ok=True)
-            with open(dest_path, "w") as fp:
-                json.dump(json_obj, fp, indent=2)
+                    except Exception as e:
+                        print(f"Media error {json_obj['id']!r}: {e}")
+                        open(media_dest_path, 'wb')  # touch file
 
-            if TWEET_DOWNLOAD_IMAGES and get_media and status.entities.get("media"):
-                try:
-                    for media in json_obj["entities"]["media"]:
-                        src = get_real_src_url(media)
-                        __, mname = os.path.split(src)
-                        media_dest_path = os.path.join(dest_dir, f"s{status.id}-{mname}")
-                        if not os.path.isfile(media_dest_path):
-                            urlretrieve(src, media_dest_path)
+                return ensureTweetComplete(json_obj, path_if_changed=dest_path)
 
-                except Exception as e:
-                    print(f"Media error {status.id!r}: {e}")
+        except (FileNotFoundError, KeyError, json.decoder.JSONDecodeError):
+            # No file yet, or file missing required keys
+            # logging.warning("Not seeing cached tweet for id " + tweet_id)
+            # raise
+            pass
 
-            if TWEET_RECURSE_THREADS and json_obj.get("in_reply_to_status_id_str"):
-                logging.info("Also downloading replied-to tweet " + json_obj['in_reply_to_status_id_str'])
-                getTweetJson(json_obj['in_reply_to_screen_name'], json_obj['in_reply_to_status_id_str'])
+    if not json_obj:
+        try:
+            json_obj = getTweetJsonTweepy(username, tweet_id, get_media=get_media, reason=reason)
+        except (TweepyException, AssertionError) as e:
+            logging.error(f"Can't retrieve tweet with id '{tweet_id}'", exc_info=1)
+            pass
+        except Exception:
+            pass
 
-            if TWEET_RECURSE_QRTS and json_obj.get("quoted_status"):
-                logging.info("Also downloading quoted tweet " + json_obj.get("quoted_status")['id_str'])
-                getTweetJson(json_obj.get("quoted_status")['user']['screen_name'], status._json.get("quoted_status")['id'])
+    if not json_obj:
+        try:
+            print("Fetching nittr", tweet_id)
+            (json_obj, bonus_tweets) = getTweetJsonNittr(username, tweet_id)
+            for json_obj_ex in bonus_tweets:
+                dest_dir_2 = os.path.join("tweets", json_obj_ex['user']['screen_name'])
+                dest_path_2 = os.path.join(dest_dir_2, f"s{json_obj_ex['id']}.json")
+                os.makedirs(dest_dir_2, exist_ok=True)
+                # print("Saving bonus", json_obj_ex['id'])
+
+                with open(dest_path_2, "w") as fp:
+                    json.dump(json_obj_ex, fp, indent=2)
+        except FileNotFoundError as e2:
+            logging.error(e2, exc_info=True)
+            pass
+
+    if (not json_obj) and TWEET_FALLBACK_ON:
+        try:
+            json_obj = getTweetJsonFileFallback(username, tweet_id)
+        except FileNotFoundError as e2:
+            logging.error(str(e2), exc_info=False)
+            pass
+
+    if json_obj:
+        os.makedirs(dest_dir, exist_ok=True)
+
+        with open(dest_path, "w") as fp:
+            json.dump(json_obj, fp, indent=2)
+
+        if TWEET_RECURSE_THREADS and json_obj.get("in_reply_to_status_id_str"):
+            logging.info("Also downloading replied-to tweet " + json_obj['in_reply_to_status_id_str'])
+            getTweetJson(json_obj['in_reply_to_screen_name'], json_obj['in_reply_to_status_id_str'], reason="reply")
+
+        if TWEET_RECURSE_QRTS and json_obj.get("quoted_status"):
+            logging.info("Also downloading quoted tweet " + json_obj.get("quoted_status")['id_str'])
+            getTweetJson(json_obj.get("quoted_status")['user']['screen_name'], json_obj.get("quoted_status")['id'], reason="quoted")
+
+        if TWEET_DOWNLOAD_IMAGES and get_media and json_obj.get("entities", {}).get("media"):
+            try:
+                for media in json_obj["entities"]["media"]:
+                    src = get_real_src_url(media)
+                    __, mname = os.path.split(src)
+                    media_dest_path = os.path.join(dest_dir, f"s{json_obj['id']}-{mname}")
+                    if not os.path.isfile(media_dest_path):
+                        urlretrieve(src, media_dest_path)
+
+            except Exception as e:
+                print(f"Media error {json_obj['id']!r}: {e}")
+
+        return json_obj
+    else:
+        raise Exception(f"Can't retrieve tweet with id '{tweet_id}'")
+
+def getTweetJsonNittr(username, tweet_id):
+    if NITTR_HOST:
+        import bs4
+        # import pickle
+
+        nittr_url = '/'.join([NITTR_HOST, username, 'status', tweet_id])
+
+        resp = requests.get(nittr_url, headers={'User-Agent': 'curl/8.0.1'})
+        resp.raise_for_status()
+        # with open("temp.pickle", 'wb') as fp:
+        #     pickle.dump(resp.text, fp)
+        soup = bs4.BeautifulSoup(resp.text, features="lxml")
+
+        # with open("temp.pickle", 'rb') as fp:
+        #     soup = bs4.BeautifulSoup(pickle.load(fp), features="lxml")
+
+        def getNittrTweetObj(tweet_el):
+            # print(tweet_el)
+            json_obj = {
+                'id': tweet_id,
+                'user': {'screen_name': username},
+                'entities': {
+                    "hashtags": [],
+                    "symbols": [],
+                    "user_mentions": [],
+                    "urls": [],
+                    "media": [],
+                }
+            }
+
+        # try:
+            import posixpath
+            path_str = urllib.parse.urlparse(tweet_el.select('.tweet-date a')[0]['href']).path
+
+            json_obj['id'] = posixpath.split(path_str)[-1]
+            json_obj['user']['screen_name'] = str(tweet_el.select('.tweet-header .username')[0]['title'][1:])
+            json_obj['user']['name'] = str(tweet_el.select('.tweet-header .fullname')[0]['title'])
+        # except IndexError:
+        #     logging.warning("Could not get display name", exc_info=True)
+
+        # try:
+            json_obj['full_text'] = str(tweet_el.select('.tweet-content.media-body')[0].text)
+        # except IndexError:
+        #     logging.warning("Tweet did not have note? Check has_note logic")
+        #     logging.warning(soup.select('.tweet-content.media-body'))
+
+        # try:
+            for media_el in tweet_el.select('.attachments .attachment.image'):
+                href = urllib.parse.urljoin(NITTR_HOST, media_el.find('a', class_='still-image')['href'])
+                # print(href)
+                json_obj['entities']['media'].append({
+                    "type": "photo",
+                    "media_url": href,
+                    "media_url_https": href
+                })
+        # except IndexError:
+        #     logging.error(exc_info=True)
 
             return json_obj
 
-        except (TweepyException, AssertionError) as e:
-            # logging.error(f"Can't load tweet {username}/{tweet_id}: '{e}'")
-            if TWEET_FALLBACK_ON:
-                try:
-                    return getTweetJsonFallback(username, tweet_id)
-                except FileNotFoundError as e2:
-                    logging.error(str(e2), exc_info=False)
-                    raise e
-            else:
-                raise
-        except Exception:
-            logging.error(f"Can't retrieve tweet with id '{tweet_id}'", exc_info=1)
-            raise
+        json_objs = []
+
+        for tweet_el in soup.select('.main-tweet'):
+            json_obj_main = getNittrTweetObj(tweet_el)
+
+        for tweet_el in soup.select('.timeline-item .tweet-body'):
+            json_objs.append(getNittrTweetObj(tweet_el))
+
+            # print(json.dumps(json_objs, indent=2))
+
+        return (json_obj_main, json_objs)
+    else:
+        raise NotImplementedError("Tweet needs note_tweet saved, but no NITTR_HOST set!")
+
+def getTweetJsonTweepy(username, tweet_id, get_media=False, reason=""):
+    if not api:
+        raise FileNotFoundError("API configuration must be passed in to use network functionality")
+
+    # logging.warning(f"Using twitter to get status for {reason}")
+    status = api.get_status(tweet_id, tweet_mode='extended')
+    logging.info("Downloaded new tweet for id " + tweet_id)
+
+    json_obj = ensureTweetComplete(status._json)
+
+    return json_obj
 
 
-def getTweetJsonFallback(username, tweet_id, **kwargs):
+def getTweetJsonFileFallback(username, tweet_id, **kwargs):
     tweet_id = str(tweet_id)
     dest_dir = os.path.join("tweets", username)
     dest_path = os.path.join(dest_dir, f"s{tweet_id}.json")
