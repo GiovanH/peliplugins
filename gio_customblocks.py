@@ -2,12 +2,53 @@
 from customblocks.utils import Markdown as cbMarkdown
 from customblocks.utils import E as cbE
 
+defined_custom_blocks = {}
+
+# Helpers
+
+# Decorator to queue a named callback to be registered
+def customblock(name):
+    def _customblock(callback):
+        defined_custom_blocks[name] = callback
+        return callback
+    return _customblock
+
+
+def filter_key_prefixes(prefix_blacklist, object):
+    """
+    >>> filter_key_prefixes(['a_'], {'a_b': 1, 'b_c': 2})
+    {'b_c': 2}
+    """
+    filtered = filter(
+        lambda kv: not any(
+            kv[0].startswith(pre) for pre in prefix_blacklist
+        ),
+        object.items()
+    )
+    return dict(filtered)
+
+# Blocks
+
+
+@customblock('pre')
+def cb_pre(ctx, *args, **kwargs):
+    slugargs = ['-'.join(arg.split()) for arg in args]
+    return cbE(
+        f"pre.pre-wrap",
+        {'_class': ' '.join(slugargs)},
+        ctx.content,
+        **kwargs
+    )
+
+
+@customblock('aside')
 def cb_aside(ctx, title=None, *args, **kwargs):
     slugargs = ['-'.join(arg.split()) for arg in args]
     return cbE(
         f"aside.cb.{title}",
         {'_class': ' '.join(slugargs)},
-        cbE(f"div", {'class': 'aside-header'},
+        cbE(
+            f"div", {'class': 'aside-header'},
             cbE(f"span", {'class': 'icon'}),
             cbE(f"span", {'class': 'type'}),
         ),
@@ -15,6 +56,8 @@ def cb_aside(ctx, title=None, *args, **kwargs):
         **kwargs
     )
 
+
+@customblock('blockquote')
 def cb_blockquote(ctx, *args, **kwargs):
     slugargs = ['-'.join(arg.split()) for arg in args]
     return cbE(
@@ -24,6 +67,8 @@ def cb_blockquote(ctx, *args, **kwargs):
         **kwargs
     )
 
+
+@customblock('spoiler')
 def cb_spoiler(ctx, desc=None, *args, **kwargs):
     slugargs = ['-'.join(arg.split()) for arg in args]
     return cbE(
@@ -40,72 +85,73 @@ def cb_spoiler(ctx, desc=None, *args, **kwargs):
         **kwargs
     )
 
+
+@customblock('imessage')
 def cb_imessage(ctx, name=None, image=None, *args, **kwargs):
     slugargs = ['-'.join(arg.split()) for arg in args]
     body_etree = cbE(
         "blockquote",
         {'class': ' '.join(['imessage'] + slugargs)},
-        (cbE('div', {'class': 'phhead'},
-            (cbE('img', {'src': image}) if image else None),
-            (name if name else None)
-        ) if image or name else None),
+        (
+            cbE(
+                'div',
+                {'class': 'phhead'},
+                (cbE('img', {'src': image}) if image else None),
+                (name if name else None)
+            )
+            if image or name else None
+        ),
         cbMarkdown(ctx.content, ctx.parser),
         **kwargs
     )
-    # l2 = []
-    # for author_group in body_etree[0].findall('li'):
-    #     for message_elem in author_group[0].findall('li'):
-    #         message_elem.set('data-author', author_group.text)
-    #         l2.append(message_elem)
+
     for root in body_etree.findall('ul'):
         for author_group in root.findall('li'):
             author = author_group.text
             lowered = author.lower()
             author_group.set('data-author', lowered)
             if lowered not in ['you', 'them']:
-                author_group.insert(0,
+                author_group.insert(
+                    0,
                     cbE('span', {'class': 'author'}, author)
                 )
             author_group.text = ''
 
     return body_etree
 
-
+@customblock('discord')
 def cb_discord(ctx, name=None, image=None, *args, **kwargs):
     slugargs = ['-'.join(arg.split()) for arg in args]
     body_etree = cbE(
         "blockquote",
         {'class': ' '.join(['discord'] + slugargs)},
         cbMarkdown(ctx.content, ctx.parser),
-        **dict(filter(lambda kv: not any(
-            kv[0].startswith(pre) for pre in ['color_', 'avatar_']
-        ), kwargs.items()))
+        **filter_key_prefixes(['color_', 'avatar_'], kwargs)
     )
 
     for root in body_etree.findall('ul'):
         for author_group in root.findall('li'):
             author_group.set('data-author', author_group.text.lower())
-            style = ""
+            style_str = ""
             color = kwargs.get(f'color_{author_group.text}')
             if color:
-                style += f"--role-color: {color}; "
+                style_str += f"--role-color: {color}; "
             avatar = kwargs.get(f'avatar_{author_group.text}')
             if avatar:
-                style += f"--icon: url({avatar}); "
-            if style:
-                author_group.set('style', style)
+                style_str += f"--icon: url({avatar}); "
+            if style_str:
+                author_group.set('style', style_str)
     return body_etree
+
 
 def pelican_init(pelican_object):
 
     def registerCustomBlock(name, callback):
         pelican_object.settings['MARKDOWN']['extension_configs']['customblocks']['generators'][name] = callback
 
-    registerCustomBlock('aside', cb_aside)
-    registerCustomBlock('blockquote', cb_blockquote)
-    registerCustomBlock('spoiler', cb_spoiler)
-    registerCustomBlock('imessage', cb_imessage)
-    registerCustomBlock('discord', cb_discord)
+    for (name, callback) in defined_custom_blocks.items():
+        registerCustomBlock(name, callback)
+
 
 def register():
     """Plugin registration"""
