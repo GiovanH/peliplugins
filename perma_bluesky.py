@@ -10,6 +10,7 @@ import glob
 import urllib.parse
 import urllib.request
 import functools
+import netrc
 
 try:
     import ujson as json
@@ -108,9 +109,8 @@ def getApi():
     if api:
         return api
 
-    assert BSKY_PASSWD
-
-    api = atproto.Client()
+    rc = netrc.netrc()
+    (BSKY_USER, _, BSKY_PASSWD) = rc.authenticators("bsky.social")
     profile = api.login(BSKY_USER, BSKY_PASSWD)
     logging.info(f"Logged in as {profile.displayName}")
 
@@ -146,16 +146,16 @@ class SkeetEmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
             tweet_json = getSkeetJson(username, tweet_id, get_media=True, reason=tweet_id)
             # logging.warning("Got tweet json")
 
-        except TweepyException as e:
-            logging.error(f"Can't load tweet {username}/status/{tweet_id}: '{e}'")
-            reason = e.response.text
-            if e.response.status_code == 144:
-                reason = "Skeet has been deleted"
-            return ET.fromstring(f"<p>Couldn't find tweet <a href='{href}'>'{title or tweet_id}'</a> ({reason})</p>"), m.start(0), index
+        # except TweepyException as e:
+        #     logging.error(f"Can't load skeet {username}/status/{tweet_id}: '{e}'")
+        #     reason = e.response.text
+        #     if e.response.status_code == 144:
+        #         reason = "Skeet has been deleted"
+        #     return ET.fromstring(f"<p>Couldn't find skeet <a href='{href}'>'{title or tweet_id}'</a> ({reason})</p>"), m.start(0), index
 
         except:
-            logging.error("Can't load tweet " + tweet_id, exc_info=True)
-            return ET.fromstring(f"<p>ERROR! Can't load tweet <a href='{href}'>'{title}'</a></p>"), m.start(0), index
+            logging.error("Can't load skeet " + tweet_id, exc_info=True)
+            return ET.fromstring(f"<p>ERROR! Can't load skeet <a href='{href}'>'{title}'</a></p>"), m.start(0), index
 
         # try:
         #     # Legacy support:
@@ -265,7 +265,7 @@ def getSkeetJson(username, tweet_id, get_media=False, reason=""):
         try:
             json_obj = getSkeetJsonApi(username, tweet_id, get_media=get_media, reason=reason)
         except Exception:
-            logging.error(f"Can't retrieve tweet with id '{tweet_id}'", exc_info=1)
+            logging.error(f"Can't retrieve skeet with id '{tweet_id}'", exc_info=1)
             pass
 
     if json_obj:
@@ -296,7 +296,7 @@ def getSkeetJson(username, tweet_id, get_media=False, reason=""):
 
         return json_obj
     else:
-        raise Exception(f"Can't retrieve tweet with id '{tweet_id}'")
+        raise Exception(f"Can't retrieve skeet with id '{tweet_id}'")
 
 def getSkeetJsonApi(username, tweet_id, get_media=False, reason=""):
     if not getApi():
@@ -348,10 +348,10 @@ def replaceBlanksInFile(filepath, replace_only_uncaptioned=True):
             body = body.replace(whole_md_object, force_uncaptioned_prefix + rendered)
             dirty = True
         except FileNotFoundError:
-            logging.warning(f"No saved info for tweet {match!r} {(username, tweet_id)!r}", exc_info=False)
+            logging.warning(f"No saved info for skeet {match!r} {(username, tweet_id)!r}", exc_info=False)
         except Exception as e:
             logging.error(e, exc_info=True)
-            logging.warning(f"{filepath}: Couldn't get tweet \n\t{match.group()}")
+            logging.warning(f"{filepath}: Couldn't get skeet \n\t{match.group()}")
 
     if dirty:
         with open(filepath, "w", encoding="utf-8") as fp:
@@ -361,14 +361,12 @@ def replaceBlanksInFile(filepath, replace_only_uncaptioned=True):
 if __name__ == "__main__":
     import sys
 
-    tweepy_config_path = os.path.abspath("./tweepy_config.py")
-    sys.path.insert(0, os.path.dirname(tweepy_config_path))
-
-    from tweepy_config import BSKY_USER, BSKY_PASSWD
-    from atproto import Client
+    # from atproto import Client
     try:
         assert BSKY_PASSWD
         api = Client()
+        rc = netrc.netrc()
+        (BSKY_USER, _, BSKY_PASSWD) = rc.authenticators("bsky.social")
         profile = api.login(BSKY_USER, BSKY_PASSWD)
         logging.info(f"Logged in as {profile.displayName}")
     except ImportError:
@@ -376,7 +374,7 @@ if __name__ == "__main__":
     except Exception:
         import traceback
         traceback.print_exc()
-        logging.info("Tweepy not configured; using local tweets only.")
+        logging.info("API not configured; using local skeets only.")
 
     for globstr in sys.argv[1:]:
         print(globstr)
