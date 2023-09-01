@@ -3,14 +3,14 @@ import logging
 import markdown
 import os
 import re
-import atproto
-from tweepy.errors import TweepyException
+# import atproto
 import xml.etree.ElementTree as ET
 import glob
 import urllib.parse
 import urllib.request
 import functools
 import netrc
+import chitose
 
 try:
     import ujson as json
@@ -111,6 +111,7 @@ def getApi():
 
     rc = netrc.netrc()
     (BSKY_USER, _, BSKY_PASSWD) = rc.authenticators("bsky.social")
+    api = chitose.BskyAgent(service='https://bsky.social')
     profile = api.login(BSKY_USER, BSKY_PASSWD)
     logging.info(f"Logged in as {profile.displayName}")
 
@@ -302,13 +303,14 @@ def getSkeetJsonApi(username, tweet_id, get_media=False, reason=""):
     if not getApi():
         raise FileNotFoundError("API configuration must be passed in to use network functionality")
 
-    # logging.warning(f"Using twitter to get status for {reason}")
-    feed = atproto.xrpc_client.namespaces.sync_ns.FeedNamespace(getApi())
-    response = feed.get_post_thread({'uri': f"at://did:plc:bzmltrv42dtnfs2ofcemy6bx/app.bsky.feed.post/{tweet_id}"})
-    logging.info("Downloaded new tweet for id " + tweet_id)
-    logging.info(response)
+    did = json.loads(getApi().get_profile(actor=username))['did']
+    logging.warning(f"Using bluesky to get status at://{did}/app.bsky.feed.post/{tweet_id} for {reason}")
+    response = getApi().get_post_thread(uri=f"at://{did}/app.bsky.feed.post/{tweet_id}")
+    logging.info("Downloaded new skeet for id " + tweet_id)
 
-    return todict(response.thread.post)
+    response = json.loads(response)
+    response['thread']['post']['id'] = tweet_id
+    return response['thread']['post']
     # return {
     #     k: (v if isinstance(v, (str, list, int)) else v.__dict__)
     #     for k, v in {
@@ -363,12 +365,11 @@ if __name__ == "__main__":
 
     # from atproto import Client
     try:
-        assert BSKY_PASSWD
-        api = Client()
         rc = netrc.netrc()
         (BSKY_USER, _, BSKY_PASSWD) = rc.authenticators("bsky.social")
+        api = chitose.BskyAgent(service='https://bsky.social')
         profile = api.login(BSKY_USER, BSKY_PASSWD)
-        logging.info(f"Logged in as {profile.displayName}")
+        logging.info(f"Logged in as {BSKY_USER}")
     except ImportError:
         logging.warning("Couldn't import , won't have internet functionality!", exc_info=True)
     except Exception:

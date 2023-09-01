@@ -13,7 +13,10 @@ RENDERDEPS_USE_SOUP_DEFAULT = False
 
 def makeStrmatches(args, kwargs):
     tagmatch = f"<{args[0]} " if len(args) > 0 else ""
-    classmatches = [f'class="{v}"' for v in kwargs.get('class_', [])]
+    class_args = kwargs.get('class_', [])
+    if isinstance(class_args, str):
+        class_args = [class_args]
+    classmatches = [f'class="{v}"' for v in class_args]
     if classmatches:
         return [
             f"{tagmatch}{c}"
@@ -39,7 +42,7 @@ def process_dependencies(article, generator=None):
 
     dirty = False
 
-    for (args, kwargs, strmatches_), dep in dependencies:
+    for (args, kwargs, *strmatches_), dep in dependencies:
         # logging.debug(f"Checking for '{args} {kwargs}'")
 
         if use_soup:
