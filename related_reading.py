@@ -101,7 +101,12 @@ class RelatedReadingAggregateGenerator(CachingGenerator):
         soup_text = BeautifulSoup(page._content, 'html.parser')
 
         page_links = []
-        for anchor in soup_text.find_all("a", class_="related_reading"):
+
+        anchors = itertools.chain(
+            soup_text.find_all("a", class_="related-reading"),
+            soup_text.select(".related-reading a")
+        )
+        for anchor in anchors:
             page_links.append(dict(text=anchor.text, href=anchor.get('href')))
 
         page_category = page.category.name if getattr(page, 'category', 'None') != 'None' else ''
@@ -136,7 +141,11 @@ class RelatedReadingAggregateGenerator(CachingGenerator):
         page_title = unTypography(soup.title.string) if soup.title is not None else ''
         
         page_links = []
-        for anchor in soup.find_all("a", class_="related_reading"):
+        anchors = itertools.chain(
+            soup.find_all("a", class_="related-reading"),
+            soup.select(".related-reading a")
+        )
+        for anchor in anchors:
             page_links.append(dict(text=anchor.text, href=anchor.href))
 
         # Should set default category?
