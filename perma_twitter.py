@@ -354,7 +354,11 @@ def ensureTweetComplete(json_obj, path_if_changed=None):
             logging.warning(f"Using nittr to get full_text for {json_obj['id_str']} from {nittr_url=} b/c {json_obj.get('full_text_orig')=}")
             # logging.warning(json_obj)
             resp = requests.get(nittr_url, headers={'User-Agent': 'curl/8.0.1'})
-            resp.raise_for_status()
+            try:
+                resp.raise_for_status()
+            except Exception:
+                print(resp.text)
+                raise
             soup = bs4.BeautifulSoup(resp.text, features="lxml")
             try:
                 note_tweet = soup.select('.tweet-content.media-body')[0].text
@@ -514,10 +518,14 @@ def getTweetJsonNittr(username, tweet_id):
 
         resp = requests.get(
             nittr_url,
-            headers={'User-Agent': 'curl/8.0.1'},
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'},
             cookies={'hlsPlayback': 'on'}
         )
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except Exception:
+            print(resp)
+            raise
         # with open("temp.pickle", 'wb') as fp:
         #     pickle.dump(resp.text, fp)
         soup = bs4.BeautifulSoup(resp.text, features="lxml")
