@@ -621,7 +621,7 @@ envUnstrict.filters['tw_stripents'] = tw_stripents
 
 class PermaTwitter(PermaSocial):
     NOUN_POST = "tweet"
-    LINK_RE = r"(https|http)://(www.){0,1}twitter\.com/(?P<user_id>[^/]+)/status/(?P<post_id>\d+).*?"
+    LINK_RE = r"(https|http)://(www.){0,1}(twitter|x)\.com/(?P<user_id>[^/]+)/status/(?P<post_id>\d+).*?"
 
     EMBED_TEMPLATE = env.from_string(
         """{{ user.screen_name }}: {{ full_text|replace("\n\n", " - ")|replace("\n", " - ") }}]"""
@@ -759,13 +759,15 @@ class PermaTwitter(PermaSocial):
     def getTweetJsonGalleryDl(self: typing.Self, post_reference: PostReference, reason="") -> WorkResult:
         # TwitterTweetExtractor.tweets of <gallery_dl.extractor.twitter.TwitterTweetExtractor
         extractor = gallery_dl.extractor.find(f"https://twitter.com/{post_reference.user_id}/status/{post_reference.post_id}")
+        extractor.initialize()
+        extractor._init()
         extractor.log = logging
         try:
             [*extractor.items()]
-        except StopIteration:
+        except (StopIteration, KeyError):
             pass
 
-        extracted = extractor.tweets()[0]
+        extracted = [*extractor.tweets()][0]
         json_obj = extracted['legacy']
         json_obj['user'] = extracted['core']['user_results']['result']['legacy']
         json_obj['user'] = json_obj['user'] or extractor._user_obj
