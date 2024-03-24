@@ -33,6 +33,10 @@ def process_content(instance, generator=None):
             if url[1:] not in element_ids:
                 issues.append(f"'{anchor}' backlink has no referent")
 
+    # Hash text isn't respected by first child, so this catches inline links too.
+    # for anchor in soup_doc.select("blockquote > p > a:first-child:not(.cite)"):
+    #     issues.append(f"Blockquote begins with plain link, probably meant to be a citation: {anchor}")
+
     if instance.status != "draft" and not isinstance(generator, PagesGenerator):
         if instance.summary:
             SUMMARY_MAX_LENGTH = instance.settings.get('SUMMARY_MAX_LENGTH')

@@ -225,7 +225,7 @@ class PermaSocial:
                     # return ET.fromstring(string), m.start(0), m.end(0)
                     return self.md.htmlStash.store(string), m.start(0), index
                 except Exception as e:
-                    logging.error(string, exc_info=False)
+                    logging.error(string, exc_info=True)
                     raise e
 
             def getLink(self, data, index) -> typing.Union[typing.Tuple[str, typing.Mapping[str, str], str, str, bool], typing.Tuple[None, None, None, None, None]]:
@@ -281,6 +281,8 @@ def bs_htmlize(text, facets):
                     feature['uri'],
                     f"<a href='{feature['uri']}'>{feature['uri']}</a>"
                 )
+            elif feature['$type'] == "app.bsky.richtext.facet#mention":
+                continue
             else:
                 raise NotImplementedError(feature['$type'])
     return paragraphs
@@ -758,6 +760,8 @@ class PermaTwitter(PermaSocial):
 
     def getTweetJsonGalleryDl(self: typing.Self, post_reference: PostReference, reason="") -> WorkResult:
         # TwitterTweetExtractor.tweets of <gallery_dl.extractor.twitter.TwitterTweetExtractor
+        # Configured with system defaults, probably %APPDATA%\gallery-dl\config.json
+        gallery_dl.config.load()
         extractor = gallery_dl.extractor.find(f"https://twitter.com/{post_reference.user_id}/status/{post_reference.post_id}")
         extractor.initialize()
         extractor._init()
@@ -773,7 +777,6 @@ class PermaTwitter(PermaSocial):
         json_obj['user'] = json_obj['user'] or extractor._user_obj
 
         return WorkResult(json_obj, nontrivial=True)  # (json_obj_main, json_objs)
-
 
     def getTweetJsonNittr(self: typing.Self, post_reference: PostReference, reason="") -> WorkResult:
         if not self.NITTR_HOST:
@@ -917,11 +920,11 @@ class PermaTwitter(PermaSocial):
 
     JSON_GETTERS = [
         *PermaSocial.JSON_GETTERS,
-        getPostJsonTweepy,
+        # getPostJsonTweepy,
         timeout_decorator.timeout(10, use_signals=False)(getTweetJsonGalleryDl),
-        getTweetJsonNittr,
-        getTweetJsonGalleryDl,
-        getTweetInternetArchive
+        # getTweetJsonNittr,
+        getTweetInternetArchive,
+        getTweetJsonGalleryDl
     ]
     # JSON_GETTERS = [*PermaSocial.JSON_GETTERS, getTweetInternetArchive]
 
