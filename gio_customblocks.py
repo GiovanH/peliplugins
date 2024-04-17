@@ -144,6 +144,37 @@ def cb_discord(ctx, name=None, image=None, *args, **kwargs):
     return body_etree
 
 
+@customblock('askblog')
+def cb_askblog(ctx, *args, **kwargs):
+    slugargs = ['-'.join(arg.split()) for arg in args]
+    return cbE(
+        "div",
+        {'class': 'askblog-wrapper'},
+        cbE(
+            "blockquote",
+            {'class': ' '.join(['askblog-question', *slugargs])},
+            cbE(
+                "div",
+                {'class': 'askblog-prefix'},
+                cbMarkdown(f"**{kwargs.pop('name', 'Anonymous')}** asked:", ctx.parser),
+            ),
+            cbMarkdown(ctx.content, ctx.parser),
+            cbE(
+                "div",
+                {'class': 'askblog-arrow'}
+            ),
+        ),
+        cbE(
+            "div",
+            {'class': 'askblog-avatar'},
+            cbE(
+                "img",
+                {'src': kwargs.pop('avatar', '/theme/blocks/ask_anon.png')}
+            ),
+        ),
+        **kwargs
+    )
+
 def pelican_init(pelican_object):
 
     def registerCustomBlock(name, callback):
