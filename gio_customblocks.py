@@ -1,6 +1,8 @@
 # -*- coding: utf8 -*-
 from customblocks.utils import Markdown as cbMarkdown
 from customblocks.utils import E as cbE
+import xml
+import logging
 
 defined_custom_blocks = {}
 
@@ -108,9 +110,9 @@ def cb_imessage(ctx, name=None, image=None, *args, **kwargs):
     for root in body_etree.findall('ul'):
         for author_group in root.findall('li'):
             author = author_group.text
-            lowered = author.lower()
-            author_group.set('data-author', lowered)
-            if lowered not in ['you', 'them']:
+            author_key = author
+            author_group.set('data-author', author_key)
+            if author_key not in ['you', 'them']:
                 author_group.insert(
                     0,
                     cbE('span', {'class': 'author'}, author)
@@ -120,27 +122,64 @@ def cb_imessage(ctx, name=None, image=None, *args, **kwargs):
     return body_etree
 
 @customblock('discord')
-def cb_discord(ctx, name=None, image=None, *args, **kwargs):
-    slugargs = ['-'.join(arg.split()) for arg in args]
+def cb_discord(ctx, *args, **kwargs):
+    slugargs = ['-'.join(arg.split()) for arg in args if arg]
     body_etree = cbE(
         "blockquote",
-        {'class': ' '.join(['discord'] + slugargs)},
+        {'class': ' '.join(['discord', *slugargs])},
         cbMarkdown(ctx.content, ctx.parser),
         **filter_key_prefixes(['color_', 'avatar_'], kwargs)
     )
 
-    for root in body_etree.findall('ul'):
-        for author_group in root.findall('li'):
-            author_group.set('data-author', author_group.text.lower())
-            style_str = ""
-            color = kwargs.get(f'color_{author_group.text}')
-            if color:
-                style_str += f"--role-color: {color}; "
-            avatar = kwargs.get(f'avatar_{author_group.text}')
-            if avatar:
-                style_str += f"--icon: url({avatar}); "
-            if style_str:
-                author_group.set('style', style_str)
+    def _cssSlug(string):
+        return '-'.join(
+            string.lower().split(' ')
+        )
+
+    avatar_prefix = 'avatar_'
+    root_style = '; '.join([
+        f"--icon-{_cssSlug(k[len(avatar_prefix):])}: url({v})"
+        for (k, v) in kwargs.items()
+        if k.startswith(avatar_prefix)
+    ])
+    if root_style:
+        body_etree.set('style', root_style)
+
+    for time_segment in body_etree.findall('ul'):
+        for (i, author_group) in enumerate(time_segment.findall('li')):
+            try:
+                if p := author_group.find('p'):
+                    # If starting a new list
+                    logging.error(xml.etree.ElementTree.tostring(p))
+                    author_group.text = p.text
+                    author_group.remove(p)
+                author_name = author_group.text.split("<")[0].strip()
+
+                if author_name == 'SYS':
+                    author_group.set('class', 'sys')
+                    author_group.text = ''
+                else:
+                    author_group.set('data-author', author_name)
+
+                style_str = ""
+                color = kwargs.get(f'color_{author_name}')
+                if color:
+                    style_str += f"--role-color: {color}; "
+                avatar = kwargs.get(f'avatar_{author_name}')
+                if avatar:
+                    style_str += f"--icon: var(--icon-{_cssSlug(author_name)}); "
+                if style_str:
+                    author_group.set('style', style_str)
+            except Exception:
+                logging.error(
+                    f"Bad discord input in group {i} of "
+                    f"{xml.etree.ElementTree.tostring(author_group)} (body "
+                    f"{xml.etree.ElementTree.tostring(author_group)})", exc_info=True)
+                raise
+            # else:
+            #     logging.error(f"Good discord input {xml.etree.ElementTree.tostring(author_group)}")
+
+
     return body_etree
 
 
