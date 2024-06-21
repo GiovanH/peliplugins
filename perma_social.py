@@ -118,7 +118,7 @@ class PermaSocial:
 
         filename = f"s{post_reference.post_id}.json"
         if media_id:
-            filename = f"s{post_reference.post_id}-{media_id}"
+            filename = f"s{post_reference.post_id}-{media_id}".split('?')[0]
 
         return os.path.join(dest_dir, filename)
 
@@ -180,6 +180,7 @@ class PermaSocial:
                 media_dest_path = self.getPostFilePath(json_obj, post_reference, media_id=mname)
 
                 if isinstance(src_url, str):
+                    src_url = src_url.split('?')[0]
                     if not os.path.isfile(media_dest_path):
                         logging.warning(f"DL {src_url} -> {media_dest_path}")
                         urlretrieve(src_url, media_dest_path)
@@ -252,14 +253,19 @@ class PermaSocial:
             # try:
             matches = match.groupdict()
             post_reference = self.PostRef(**matches)
-            json_obj = self.getPostJson(post_reference, get_media=True, reason=matches)
+            try:
+                json_obj = self.getPostJson(post_reference, get_media=True, reason=matches)
+            except Exception as e:
+                logging.error("Could not get json to render embed", exc_info=True)
+                continue
 
             try:
                 rendered = force_uncaptioned_prefix + self.EMBED_TEMPLATE.render(**matches, **json_obj)
             except Exception as e:
                 logging.error(matches, exc_info=False)
                 logging.error(json_obj, exc_info=False)
-                raise e
+                # raise e
+
             whole_md_object = force_uncaptioned_prefix + "](" + match.group(0)
 
             logging.debug(f"{whole_md_object!r} -> {rendered!r}")
@@ -350,6 +356,7 @@ class PermaBluesky(PermaSocial):
         for image_def in json_obj.get('embed', {}).get('images', []):
             src_url = image_def['fullsize']
             name = posixpath.split(src_url)[-1].replace('@', '.')
+            name = name.split('?')[0]
             yield (name, src_url)
 
     @functools.lru_cache()
@@ -511,7 +518,7 @@ class PermaMastodon(PermaSocial):
 
         filename = f"s{post_reference.post_id}.json"
         if media_id:
-            filename = f"s{post_reference.post_id}-{media_id}"
+            filename = f"s{post_reference.post_id}-{media_id}".split('?')[0]
 
         return os.path.join(dest_dir, filename)
 
@@ -767,11 +774,17 @@ class PermaTwitter(PermaSocial):
         extractor._init()
         extractor.log = logging
         try:
-            [*extractor.items()]
+            debug_items = [*extractor.items()]
         except (StopIteration, KeyError):
             pass
 
-        extracted = [*extractor.tweets()][0]
+        try:
+            extracted = [*extractor.tweets()][0]
+        except IndexError:
+            logging.error(f"Couldn't get tweets from tweet extractor {extractor!r}")
+            logging.warning(debug_items)
+            raise
+
         json_obj = extracted['legacy']
         json_obj['user'] = extracted['core']['user_results']['result']['legacy']
         json_obj['user'] = json_obj['user'] or extractor._user_obj
@@ -883,7 +896,7 @@ class PermaTwitter(PermaSocial):
         try:
             resp.raise_for_status()
         except Exception:
-            print(resp.text)
+            # print(resp.text)
             raise
         soup = bs4.BeautifulSoup(resp.text, features="lxml")
 
@@ -990,7 +1003,6 @@ class PelicanTweetEmbedMdExtension(markdown.Extension):
         )
 
 def pelican_init(pelican_object):
-    logging.info("pelican_init")
     pelican_object.settings['MARKDOWN'].setdefault('extensions', []) \
         .append(PelicanSkeetEmbedMdExtension())
     pelican_object.settings['MARKDOWN'].setdefault('extensions', []) \
@@ -1001,7 +1013,6 @@ def pelican_init(pelican_object):
 
 def register():
     """Plugin registration"""
-    logging.info("register")
     signals.initialized.connect(pelican_init)
 
 
