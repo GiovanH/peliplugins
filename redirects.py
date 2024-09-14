@@ -1,9 +1,9 @@
 import os
 import logging
-from six.moves.urllib.parse import urljoin
+# from six.moves.urllib.parse import urljoin
 import six
 from pelican import signals
-from pelican.utils import pelican_open
+# from pelican.utils import pelican_open
 
 if not six.PY3:
     from codecs import open
@@ -38,37 +38,34 @@ def link_source_files(generator):
         if getattr(generator, attr, None)
     ], [])
 
-    autoext_setting = generator.settings.get(
-        'SHOW_SOURCE_AUTOEXT', False
-    )
-
     # Work on each item
     for post in documents:
         if 'redirect' in post.metadata:
-            try:
-                # Get the full path to the original source file
-                # post_url = os.path.join(post.settings['OUTPUT_PATH'], post.save_as)
+            for redirect_target in post.metadata['redirect'].split(','):
+                try:
+                    # Get the full path to the original source file
+                    # post_url = os.path.join(post.settings['OUTPUT_PATH'], post.save_as)
 
-                if post.metadata['redirect'].startswith("/"):
-                    logger.warning(f"Post redirect {post.metadata['redirect']!r} starts with /, should be a directory name ON /. Coercing.")
-                    post.metadata['redirect'] = post.metadata['redirect'][1:]
+                    if redirect_target.startswith("/"):
+                        logger.warning(f"Post redirect {redirect_target!r} starts with /, should be a directory name ON /. Coercing.")
+                        redirect_target = redirect_target[1:]
 
-                write_to = os.path.join(post.settings['OUTPUT_PATH'], post.metadata['redirect'])
-                redirect_to = post.save_as
-                # TODO: If we bounced to C:/ here, error out
-            except Exception:
-                logger.error("Error processing source file for post", exc_info=True)
-                continue
+                    write_to = os.path.join(post.settings['OUTPUT_PATH'], redirect_target)
+                    redirect_to = post.save_as
+                    # TODO: If we bounced to C:/ here, error out
+                except Exception:
+                    logger.error("Error processing source file for post", exc_info=True)
+                    continue
 
-            # Format post source dict & populate
-            out = {
-                # 'redirect_post_url': post_url,
-                'redirect_write_to': write_to,
-                'redirect_to': redirect_to
-            }
+                # Format post source dict & populate
+                out = {
+                    # 'redirect_post_url': post_url,
+                    'redirect_write_to': write_to,
+                    'redirect_to': redirect_to
+                }
 
-            logger.debug('Will write redirect at %s to url %s', write_to, redirect_to)
-            source_files.append(out)
+                logger.debug('Will write redirect at %s to url %s', write_to, redirect_to)
+                source_files.append(out)
 
 
 def _copy_from_to(from_file, to_file):

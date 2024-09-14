@@ -35,6 +35,22 @@ AUTHOR_SAVE_AS_REVERSE = 'author/chrono/{slug}.html'
 
 There is no default set for these options and generation will fail if they are not set in configuration. These should be configured by the user.
 
+## Redirects
+
+Allows documents to specify "old urls" that should redirect to the new location of the document. 
+
+Pelican will try to write stub pages to the old location that redirects to the real post.
+
+### Usage
+
+Set the `redirect` metadata field to a comma-delineated list of relative URL targets. 
+
+For example:
+
+```text
+redirect: blog/2021/01/14/old-slug
+```
+
 ## Markdeep
 
 WIP support for [Markdeep](https://casual-effects.com/markdeep/) documents.
