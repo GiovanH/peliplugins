@@ -31,7 +31,7 @@ def process_content(instance, generator=None):
 
         if url.startswith("#") and url != "#":
             if url[1:] not in element_ids:
-                issues.append(f"'{anchor}' backlink has no referent")
+                issues.append(f"'{anchor}' backlink has no referent {url[1:]!r} in {sorted(element_ids)!r}")
 
     # Hash text isn't respected by first child, so this catches inline links too.
     # for anchor in soup_doc.select("blockquote > p > a:first-child:not(.cite)"):
@@ -40,17 +40,20 @@ def process_content(instance, generator=None):
     if instance.status != "draft" and not isinstance(generator, PagesGenerator):
         if instance.summary:
             SUMMARY_MAX_LENGTH = instance.settings.get('SUMMARY_MAX_LENGTH')
-            if SUMMARY_MAX_LENGTH and len(instance.summary) > SUMMARY_MAX_LENGTH:
+
+            summary_soup = bs4.BeautifulSoup(instance.summary, 'html.parser')
+            summary_length = len(summary_soup.text)
+            if SUMMARY_MAX_LENGTH and summary_length > SUMMARY_MAX_LENGTH:
                 if instance.content != instance.summary:
-                    issues.append(f"Summary length is {len(instance.summary)}/{SUMMARY_MAX_LENGTH}")
+                    issues.append(f"Summary length is {summary_length}/{SUMMARY_MAX_LENGTH}")
                     # issues.append(f"{instance.summary[:200]} ... {instance.summary[-200:]}")
                 else:
-                    issues.append(f"Unsummarized article length is {len(instance.summary)}/{SUMMARY_MAX_LENGTH}")
+                    issues.append(f"Unsummarized article length is {summary_length}/{SUMMARY_MAX_LENGTH}")
                     if instance.has_summary:
-                        issues.append(f"Article incorrectly has 'has_summary' set to True!")
+                        issues.append("Article incorrectly has 'has_summary' set to True!")
 
         else:
-            issues.append(f"Missing summary")
+            issues.append("Missing summary")
         
     if issues:
         logging.error(f"HTML validation errors in {instance.relative_source_path}:" + "\n" + "\n".join(issues))
