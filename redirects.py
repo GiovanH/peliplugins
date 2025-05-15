@@ -40,32 +40,38 @@ def link_source_files(generator):
 
     # Work on each item
     for post in documents:
+        redirect_targets = []
+
+        redirect_targets += post.settings.get('ARTICLE_SAVE_AS_OLD', [])
+
         if 'redirect' in post.metadata:
-            for redirect_target in post.metadata['redirect'].split(','):
-                try:
-                    # Get the full path to the original source file
-                    # post_url = os.path.join(post.settings['OUTPUT_PATH'], post.save_as)
+            redirect_targets += post.metadata.get('redirect').split(',')
 
-                    if redirect_target.startswith("/"):
-                        logger.warning(f"Post redirect {redirect_target!r} starts with /, should be a directory name ON /. Coercing.")
-                        redirect_target = redirect_target[1:]
+        for redirect_target in redirect_targets:
+            try:
+                # Get the full path to the original source file
+                # post_url = os.path.join(post.settings['OUTPUT_PATH'], post.save_as)
 
-                    write_to = os.path.join(post.settings['OUTPUT_PATH'], redirect_target)
-                    redirect_to = post.save_as
-                    # TODO: If we bounced to C:/ here, error out
-                except Exception:
-                    logger.error("Error processing source file for post", exc_info=True)
-                    continue
+                if redirect_target.startswith("/"):
+                    logger.warning(f"Post redirect {redirect_target!r} starts with /, should be a directory name ON /. Coercing.")
+                    redirect_target = redirect_target[1:]
 
-                # Format post source dict & populate
-                out = {
-                    # 'redirect_post_url': post_url,
-                    'redirect_write_to': write_to,
-                    'redirect_to': redirect_to
-                }
+                write_to = os.path.join(post.settings['OUTPUT_PATH'], redirect_target.format(**post.url_format))
+                redirect_to = post.save_as
+                # TODO: If we bounced to C:/ here, error out
+            except Exception:
+                logger.error("Error processing source file for post", exc_info=True)
+                continue
 
-                logger.debug('Will write redirect at %s to url %s', write_to, redirect_to)
-                source_files.append(out)
+            # Format post source dict & populate
+            out = {
+                # 'redirect_post_url': post_url,
+                'redirect_write_to': write_to,
+                'redirect_to': redirect_to
+            }
+
+            logger.debug('Will write redirect at %s to url %s', write_to, redirect_to)
+            source_files.append(out)
 
 
 def _copy_from_to(from_file, to_file):
@@ -81,9 +87,15 @@ def write_source_files(*args, **kwargs):
     for source in source_files:
         # TODO: If write_to is a file, skip the directory bits
         # this sort of works unimplemented???
-        to_dir = source['redirect_write_to']
-        os.makedirs(to_dir, exist_ok=True)
-        out_path = os.path.join(to_dir, "index.html")
+
+        if source['redirect_write_to'].endswith('.html'):
+            out_path = source['redirect_write_to']
+            to_dir = os.path.dirname(out_path)
+            os.makedirs(to_dir, exist_ok=True)
+        else:
+            to_dir = source['redirect_write_to']
+            os.makedirs(to_dir, exist_ok=True)
+            out_path = os.path.join(to_dir, "index.html")
 
         encoding = 'utf-8'
         with open(out_path, 'w', encoding=encoding) as text_out:
