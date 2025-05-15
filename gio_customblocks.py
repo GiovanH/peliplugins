@@ -1,22 +1,29 @@
 # -*- coding: utf8 -*-
+from typing import Callable, Sequence, TypeAlias
 from customblocks.utils import Markdown as cbMarkdown
 from customblocks.utils import E as cbE
 import xml
+import xml.etree
+import xml.etree.ElementTree  # noqa: S405
 import logging
 
-defined_custom_blocks = {}
+
+Fragment: TypeAlias = xml.etree.ElementTree.Element
+Callback: TypeAlias = Callable[..., Fragment]
+defined_custom_blocks: dict[str, Callback] = {}
 
 # Helpers
 
 # Decorator to queue a named callback to be registered
-def customblock(name):
-    def _customblock(callback):
+def customblock(name: str) -> Callable:
+    def _customblock(callback: Callback) -> Callback:
         defined_custom_blocks[name] = callback
         return callback
+
     return _customblock
 
 
-def filter_key_prefixes(prefix_blacklist, object):
+def filter_key_prefixes(prefix_blacklist: Sequence[str], obj: dict) -> dict:
     """
     >>> filter_key_prefixes(['a_'], {'a_b': 1, 'b_c': 2})
     {'b_c': 2}
@@ -25,18 +32,17 @@ def filter_key_prefixes(prefix_blacklist, object):
         lambda kv: not any(
             kv[0].startswith(pre) for pre in prefix_blacklist
         ),
-        object.items()
+        obj.items()
     )
     return dict(filtered)
 
 # Blocks
 
-
 @customblock('pre')
-def cb_pre(ctx, *args, **kwargs):
+def cb_pre(ctx, *args, **kwargs) -> Fragment:
     slugargs = ['-'.join(arg.split()) for arg in args]
     return cbE(
-        f"pre.pre-wrap",
+        "pre.pre-wrap",
         {'_class': ' '.join(slugargs)},
         ctx.content,
         **kwargs
@@ -44,15 +50,15 @@ def cb_pre(ctx, *args, **kwargs):
 
 
 @customblock('aside')
-def cb_aside(ctx, title=None, *args, **kwargs):
+def cb_aside(ctx, title=None, *args, **kwargs) -> Fragment:
     slugargs = ['-'.join(arg.split()) for arg in args]
     return cbE(
         f"aside.cb.{title}",
         {'_class': ' '.join(slugargs)},
         cbE(
-            f"div", {'class': 'aside-header'},
-            cbE(f"span", {'class': 'icon'}),
-            cbE(f"span", {'class': 'type'}),
+            "div", {'class': 'aside-header'},
+            cbE("span", {'class': 'icon'}),
+            cbE("span", {'class': 'type'}),
         ),
         cbMarkdown(ctx.content, ctx.parser),
         **kwargs
@@ -60,10 +66,10 @@ def cb_aside(ctx, title=None, *args, **kwargs):
 
 
 @customblock('blockquote')
-def cb_blockquote(ctx, *args, **kwargs):
+def cb_blockquote(ctx, *args, **kwargs) -> Fragment:
     slugargs = ['-'.join(arg.split()) for arg in args]
     return cbE(
-        f"blockquote",
+        "blockquote",
         {'class': ' '.join(slugargs)},
         cbMarkdown(ctx.content, ctx.parser),
         **kwargs
@@ -71,17 +77,17 @@ def cb_blockquote(ctx, *args, **kwargs):
 
 
 @customblock('spoiler')
-def cb_spoiler(ctx, desc=None, *args, **kwargs):
+def cb_spoiler(ctx, desc=None, *args, **kwargs) -> Fragment:
     slugargs = ['-'.join(arg.split()) for arg in args]
     return cbE(
-        f"div.spoiler-wrapper", {'_class': ' '.join(slugargs)},
-        cbE(f"button", {
+        "div.spoiler-wrapper", {'_class': ' '.join(slugargs)},
+        cbE("button", {
             'type': 'button',
             'class': 'spoiler-button',
-            'onclick': f"this.setAttribute('open', !(this.getAttribute('open') == 'true'))"
+            'onclick': "this.setAttribute('open', !(this.getAttribute('open') == 'true'))"
         }, desc),
         cbE(
-            f"div.spoiler-content",
+            "div.spoiler-content",
             cbMarkdown(ctx.content, ctx.parser)
         ),
         **kwargs
@@ -89,11 +95,11 @@ def cb_spoiler(ctx, desc=None, *args, **kwargs):
 
 
 @customblock('imessage')
-def cb_imessage(ctx, name=None, image=None, *args, **kwargs):
+def cb_imessage(ctx, name=None, image=None, *args, **kwargs) -> Fragment:
     slugargs = ['-'.join(arg.split()) for arg in args]
     body_etree = cbE(
         "blockquote",
-        {'class': ' '.join(['imessage'] + slugargs)},
+        {'class': ' '.join(['imessage', *slugargs])},
         (
             cbE(
                 'div',
@@ -110,9 +116,10 @@ def cb_imessage(ctx, name=None, image=None, *args, **kwargs):
     for root in body_etree.findall('ul'):
         for author_group in root.findall('li'):
             author = author_group.text
+            if not author: raise ValueError("Couldn't parse author group", author_group)  # noqa: E701
             author_key = author
             author_group.set('data-author', author_key)
-            if author_key not in ['you', 'them']:
+            if author_key not in {'you', 'them'}:
                 author_group.insert(
                     0,
                     cbE('span', {'class': 'author'}, author)
@@ -121,20 +128,18 @@ def cb_imessage(ctx, name=None, image=None, *args, **kwargs):
 
     return body_etree
 
+def _cssSlug(string) -> str:
+    return '-'.join( string.lower().split(' '))
+
 @customblock('discord')
-def cb_discord(ctx, *args, **kwargs):
+def cb_discord(ctx, *args, **kwargs) -> Fragment:
     slugargs = ['-'.join(arg.split()) for arg in args if arg]
-    body_etree = cbE(
+    body_etree: Fragment = cbE(
         "blockquote",
         {'class': ' '.join(['discord', *slugargs])},
         cbMarkdown(ctx.content, ctx.parser),
         **filter_key_prefixes(['color_', 'avatar_'], kwargs)
     )
-
-    def _cssSlug(string):
-        return '-'.join(
-            string.lower().split(' ')
-        )
 
     avatar_prefix = 'avatar_'
     root_style = '; '.join([
@@ -153,6 +158,8 @@ def cb_discord(ctx, *args, **kwargs):
                     logging.error(xml.etree.ElementTree.tostring(p))
                     author_group.text = p.text
                     author_group.remove(p)
+                if not author_group.text:
+                    raise ValueError("Couldn't parse author group", author_group)
                 author_name = author_group.text.split("<")[0].strip()
 
                 if author_name == 'SYS':
@@ -161,7 +168,7 @@ def cb_discord(ctx, *args, **kwargs):
                 else:
                     author_group.set('data-author', author_name)
 
-                style_str = ""
+                style_str: str = ""
                 color = kwargs.get(f'color_{author_name}')
                 if color:
                     style_str += f"--role-color: {color}; "
@@ -176,15 +183,12 @@ def cb_discord(ctx, *args, **kwargs):
                     f"{xml.etree.ElementTree.tostring(author_group)} (body "
                     f"{xml.etree.ElementTree.tostring(author_group)})", exc_info=True)
                 raise
-            # else:
-            #     logging.error(f"Good discord input {xml.etree.ElementTree.tostring(author_group)}")
-
 
     return body_etree
 
 
 @customblock('askblog')
-def cb_askblog(ctx, *args, **kwargs):
+def cb_askblog(ctx, *args, **kwargs) -> Fragment:
     slugargs = ['-'.join(arg.split()) for arg in args]
     return cbE(
         "div",
@@ -214,7 +218,8 @@ def cb_askblog(ctx, *args, **kwargs):
         **kwargs
     )
 
-def pelican_init(pelican_object):
+
+def pelican_init(pelican_object) -> None:
 
     def registerCustomBlock(name, callback):
         pelican_object.settings['MARKDOWN']['extension_configs']['customblocks']['generators'][name] = callback
@@ -225,5 +230,5 @@ def pelican_init(pelican_object):
 
 def register():
     """Plugin registration"""
-    from pelican import signals
+    from pelican import signals  # noqa: PLC0415
     signals.initialized.connect(pelican_init)
