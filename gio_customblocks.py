@@ -117,7 +117,7 @@ def cb_imessage(ctx, name=None, image=None, *args, **kwargs) -> Fragment:
         for author_group in root.findall('li'):
             author = author_group.text
             if not author: raise ValueError("Couldn't parse author group", author_group)  # noqa: E701
-            author_key = author
+            author_key = author.lower()
             author_group.set('data-author', author_key)
             if author_key not in {'you', 'them'}:
                 author_group.insert(
@@ -130,6 +130,7 @@ def cb_imessage(ctx, name=None, image=None, *args, **kwargs) -> Fragment:
 
 def _cssSlug(string) -> str:
     return '-'.join( string.lower().split(' '))
+
 
 @customblock('discord')
 def cb_discord(ctx, *args, **kwargs) -> Fragment:
@@ -172,9 +173,9 @@ def cb_discord(ctx, *args, **kwargs) -> Fragment:
                 color = kwargs.get(f'color_{author_name}')
                 if color:
                     style_str += f"--role-color: {color}; "
-                avatar = kwargs.get(f'avatar_{author_name}')
-                if avatar:
-                    style_str += f"--icon: var(--icon-{_cssSlug(author_name)}); "
+                # avatar = kwargs.get(f'avatar_{author_name}')
+                # if avatar:
+                style_str += f"--icon: var(--icon-{_cssSlug(author_name)}, var(--icon-default)); "
                 if style_str:
                     author_group.set('style', style_str)
             except Exception:
