@@ -29,7 +29,7 @@ class PermaMastodon(PermaSocial):
         <a href="{{ account.url }}">
         {% endif %}
             <img src="{{ account.avatar_static }}"
-                onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;})();"
+                onerror="// (async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;})();"
             ></img>
             <div class="vertical">
                 <span class="name">{{ account.display_name }}</span>

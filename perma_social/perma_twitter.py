@@ -89,7 +89,7 @@ def _tw_avatar_src(profile_image_url, screen_name):
     try:
         # profile_image_url = user.get('profile_image_url_https')
         image_id = profile_image_url.split('/')[-1]
-        image_path = f"tweets/{screen_name}/savatar-{image_id}"
+        image_path = f"socialposts/tweets/{screen_name}/savatar-{image_id}"
     except AttributeError:
         return b64_empty
 
@@ -157,7 +157,7 @@ class PermaTwitter(PermaSocial):
         <a href="https://twitter.com/{{ user.screen_name }}/" title="{{ user.description|replace("\n", " ") }}">
             {% if user|tw_avatar_src %}
             <img src="{{ user|tw_avatar_src }}"
-                onerror="// (async () => {this.onerror=null;const newsrc=`https://web.archive.org/web/0/${this.src}`;console.log(this, this.src, newsrc);this.src=newsrc;})();"
+                onerror="(async () => {this.onerror=null;const newsrc=`https://web.archive.org/web/0/${this.src}`;console.log(this, this.src, newsrc);this.src=newsrc;})();"
             ></img>
             {% endif %}
             <div class="vertical">
