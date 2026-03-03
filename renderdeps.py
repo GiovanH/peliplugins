@@ -17,6 +17,7 @@ def makeStrmatches(args, kwargs):
     if isinstance(class_args, str):
         class_args = [class_args]
     classmatches = [f'class="{v}"' for v in class_args]
+    classmatches += [f'class="{v} ' for v in class_args]
     if classmatches:
         return [
             f"{tagmatch}{c}"
@@ -46,7 +47,7 @@ def process_dependencies(article, generator=None):
         # logging.debug(f"Checking for '{args} {kwargs}'")
 
         if use_soup:
-            soup = BeautifulSoup(article._content, 'html.parser')
+            soup = BeautifulSoup(article._content, 'html5lib')
             if match := soup.find(*args, **kwargs):
                 logging.info("Inserting dependency " + repr(dep) + " into " + repr(article.slug) + " matching" + repr(match))
                 soup.append(BeautifulSoup(dep, 'html.parser'))

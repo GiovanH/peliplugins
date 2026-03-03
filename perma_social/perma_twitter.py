@@ -12,6 +12,7 @@ import bs4
 import subprocess  # noqa: S404
 import tweepy  # type: ignore[import]
 import timeout_decorator  # type: ignore[import]
+import pprint
 
 import xml.etree.ElementTree as ET  # noqa: S405
 import gallery_dl  # type: ignore[import]
@@ -76,7 +77,7 @@ def tw_stripents(text, id, entities, extended_entities):
     return text
 
 def tw_avatar_src(user):
-    profile_image_url = user.get('profile_image_url_https')
+    profile_image_url = user.get('profile_image_url_https') or user.get('avatar', {}).get("image_url")
     return _tw_avatar_src(profile_image_url, user['screen_name'])
 
 @functools.lru_cache()
@@ -142,7 +143,7 @@ class PermaTwitter(PermaSocial):
     LINK_RE = r"(https|http)://(www.){0,1}(twitter|x)\.com/(?P<user_id>[^/]+)/status/(?P<post_id>\d+).*?"
 
     EMBED_TEMPLATE = env.from_string(
-        """{{ user.screen_name }}: {{ full_text|replace("\n\n", " - ")|replace("\n", " - ") }}]"""
+        """{{ user.screen_name }}: {{ (note_tweet.note_tweet_results.result.text if note_tweet is defined else full_text)|replace("\n\n", " - ")|replace("\n", " - ") }}]"""
         """(https://twitter.com/{{ user.screen_name }}/status/{{ post_id }}"""  # )
     )
 
@@ -171,12 +172,13 @@ class PermaTwitter(PermaSocial):
         {% if in_reply_to_status_id %}
             <span class="replyto">Replying to <a class="prev" href="https://twitter.com/{{in_reply_to_screen_name}}/status/{{ in_reply_to_status_id }}">{{in_reply_to_screen_name}}</a>:</span>
         {% endif %}
-        <p>{{ full_text|e|replace("\n\n", "</p><p>")|replace("\n", "</p><p>")|tw_stripents(id, entities or {}, extended_entities or {})|replace("&amp;", "&")|replace("&amp;", "&") }}</p>
+        <p>{{ (note_tweet.note_tweet_results.result.text if note_tweet is defined else full_text)|e|replace("\n\n", "</p><p>")|replace("\n", "</p><p>")|tw_stripents(id, entities or {}, extended_entities or {})|replace("&amp;", "&")|replace("&amp;", "&") }}</p>
     </div>
     <div class="media" style="display: none;">{{ full_text|e|tw_entities(id, entities or {}, extended_entities or {}) }}</div>
     <a href="https://twitter.com/{{ user.screen_name }}/status/{{ post_id }}" target="_blank">{{ created_at }}</a>
 </blockquote>"""))
 
+    NITTR_HOST = "https://nitter.net"
     NITTER_CACHE: typing.Mapping[PostReference, typing.Any] = {}
 
     @staticmethod
@@ -196,16 +198,16 @@ class PermaTwitter(PermaSocial):
             raise NotImplementedError(media_entry['type'])
 
     def login(self: typing.Self) -> None:
-        tweepy_config_path = os.path.abspath("./tweepy_config.py")
-        sys.path.insert(0, os.path.dirname(tweepy_config_path))
-        import tweepy_config
+        # tweepy_config_path = os.path.abspath("./tweepy_config.py")
+        # sys.path.insert(0, os.path.dirname(tweepy_config_path))
+        # import tweepy_config
+        #
+        self._api = 'dummy'
 
-        self.NITTR_HOST = tweepy_config.NITTR_HOST or "https://nitter.net"
-
-        auth = tweepy.OAuthHandler(tweepy_config.TWEEPY_CONSUMER_KEY, tweepy_config.TWEEPY_CONSUMER_SECRET)
-        auth.set_access_token(tweepy_config.TWEEPY_ACCESS_TOKEN, tweepy_config.TWEEPY_ACCESS_TOKEN_SECRET)
-        self._api = tweepy.API(auth, wait_on_rate_limit=True)
-        logging.info("Logged in to twitter via Tweepy")
+        # auth = tweepy.OAuthHandler(tweepy_config.TWEEPY_CONSUMER_KEY, tweepy_config.TWEEPY_CONSUMER_SECRET)
+        # auth.set_access_token(tweepy_config.TWEEPY_ACCESS_TOKEN, tweepy_config.TWEEPY_ACCESS_TOKEN_SECRET)
+        # self._api = tweepy.API(auth, wait_on_rate_limit=True)
+        # logging.info("Logged in to twitter via Tweepy")
 
     def getPostMedia(self: typing.Self, json_obj) -> typing.Iterable[typing.Tuple[str, typing.Union[str, typing.Callable]]]:
         for media in json_obj["entities"].get("media", []):
@@ -223,8 +225,10 @@ class PermaTwitter(PermaSocial):
                 yield (mname, closure)
             else:
                 yield (mname, src)
-        profile_image_url = json_obj['user']['profile_image_url_https']
-        yield (profile_image_url.split('/')[-1], profile_image_url)
+        profile_image_url = json_obj['user'].get('profile_image_url_https')
+        if profile_image_url:
+            logging.warning("Missing profile image!")
+            yield (profile_image_url.split('/')[-1], profile_image_url)
 
     def ensureTweetComplete(self, json_obj, path_if_changed=None):
         # global dest_path
@@ -232,6 +236,14 @@ class PermaTwitter(PermaSocial):
         full_text = json_obj.get('full_text')  # or json_obj.get('text')
         if full_text is None:
             full_text = json_obj.get('text')
+
+        if json_obj.get('note_tweet'):
+            json_obj['full_text_orig'] = json_obj['full_text']
+            json_obj['full_text'] = json_obj['note_tweet']['note_tweet_results']['result']['text']
+            return
+
+        # Old
+
         has_note = ('… https://t.co/' in full_text) and (
             any(
                 (url['expanded_url'] == f"https://twitter.com/i/web/status/{json_obj['id']}")
@@ -243,7 +255,7 @@ class PermaTwitter(PermaSocial):
             if not self.NITTR_HOST:
                 raise NotImplementedError("Tweet needs note_tweet saved, but no NITTR_HOST set!")
 
-            nittr_url = '/'.join([self.NITTR_HOST, json_obj['user']['screen_name'], 'status', json_obj['id_str']])
+            nittr_url = '/'.join([self.NITTR_HOST, json_obj['user']['screen_name'], 'status', json_obj['id_str']]) + "#m"
             logging.warning(f"Using nittr to get full_text for {json_obj['id_str']} from {nittr_url=} b/c {json_obj.get('full_text_orig')=}")
             # logging.warning(json_obj)
             resp = requests.get(nittr_url, headers={'User-Agent': 'curl/8.0.1'})
@@ -299,8 +311,24 @@ class PermaTwitter(PermaSocial):
             raise
 
         json_obj = extracted['legacy']
-        json_obj['user'] = extracted['core']['user_results']['result']['legacy']
-        json_obj['user'] = json_obj['user'] or extractor._user_obj
+        json_obj['user'] = {
+            '_extractor': 'legacy+core'
+        }
+        json_obj['user'].update(extracted['core']['user_results']['result'])
+        json_obj['user'].update(extracted['core']['user_results']['result']['legacy'])
+        json_obj['user'].update(extracted['core']['user_results']['result']['core'])
+        # json_obj['user_obj'] = {'_extractor': '_user_obj', **extractor._user_obj}
+        # json_obj['user'] = {**json_obj['user_obj'], **json_obj['user_legacy']}
+
+        if extracted.get('note_tweet'):
+            json_obj['note_tweet'] = extracted.get('note_tweet')
+            json_obj['full_text_orig'] = json_obj['full_text']
+            json_obj['full_text'] = json_obj['note_tweet']['note_tweet_results']['result']['text']
+
+        json_obj['user']['screen_name'] = json_obj['user'].get('screen_name') or extractor._user_obj['core']['screen_name']
+
+        json_obj['_raw'] = repr(extracted)
+        json_obj['_extractor'] = 'gallerydl'
 
         return WorkResult(json_obj, nontrivial=True)  # (json_obj_main, json_objs)
 
@@ -311,7 +339,7 @@ class PermaTwitter(PermaSocial):
         if self.NITTER_CACHE.get(post_reference):
             return self.NITTER_CACHE[post_reference]
 
-        nittr_url = '/'.join([self.NITTR_HOST, post_reference.user_id, 'status', post_reference.post_id])
+        nittr_url = '/'.join([self.NITTR_HOST, post_reference.user_id, 'status', post_reference.post_id]) + "#m"
 
         logging.warning(f"Fetching nittr {post_reference=} {nittr_url=}")
 
@@ -392,6 +420,8 @@ class PermaTwitter(PermaSocial):
         for tweet_el in soup.select('.main-tweet'):
             json_obj_main = getNittrTweetObj(tweet_el)
 
+        json_obj_main['_extractor'] = 'nittr'
+
         for tweet_el in soup.select('.timeline-item .tweet-body'):
             extra_obj = getNittrTweetObj(tweet_el)
             extra_ref = PostReference(extra_obj['user']['screen_name'], extra_obj['id'])
@@ -440,6 +470,9 @@ class PermaTwitter(PermaSocial):
                     "media_url": image.get("data-image-url"),
                     "media_url_https": image.get("data-image-url")
                 })
+
+            json_obj['_extractor'] = 'ia'
+
             return WorkResult(json_obj, nontrivial=True)
 
         raise NotImplementedError(ia_url)
@@ -447,10 +480,10 @@ class PermaTwitter(PermaSocial):
     JSON_GETTERS = [
         *PermaSocial.JSON_GETTERS,
         # getPostJsonTweepy,
-        timeout_decorator.timeout(10, use_signals=False)(getTweetJsonGalleryDl),
-        # getTweetJsonNittr,
-        getTweetInternetArchive,
-        getTweetJsonGalleryDl
+        # timeout_decorator.timeout(10, use_signals=False)(getTweetJsonGalleryDl),
+        getTweetJsonNittr,
+        getTweetJsonGalleryDl,
+        # getTweetInternetArchive,
     ]
     # JSON_GETTERS = [*PermaSocial.JSON_GETTERS, getTweetInternetArchive]
 

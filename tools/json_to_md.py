@@ -13,6 +13,7 @@ from typing import Optional, Mapping
 import functools
 import operator
 
+MODE_CUSTOMBLOCKS = False
 QUIRK_EXTRA_LABELS: bool = False
 QUIRK_TRIM: bool = False
 QUIRK_NO_REPEAT_CHANNEL: bool = False
@@ -29,12 +30,25 @@ def keyfunc_authorgroup(msg) -> str:
 
 
 def discordHeaderBlock(message_list) -> str:
-    args: list[str] = sorted({
-        f'avatar_{author["nickname"]}="{author["avatarUrl"]}"'
-        for author in
-        (message['author'] for message in message_list)
-    })
-    return (f"::: discord {' '.join(args)}")
+    mdheader = repr({message['author']["nickname"] for message in message_list}) + \
+    " " + formatMessageTime(message_list[0], "%B %d, %Y")
+    if MODE_CUSTOMBLOCKS:
+        args: list[str] = sorted({
+            f'avatar_{author["nickname"]}="{author["avatarUrl"]}"'
+            for author in
+            (message['author'] for message in message_list)
+        })
+        return (f"## {mdheader}\n\n::: discord {' '.join(args)}")
+    else:
+        avatars = {
+            author["nickname"]: author["avatarUrl"]
+            for author in
+            (message['author'] for message in message_list)
+        }
+        yamloptsstr = '\n' + '\n'.join(
+            ["    avatars: " + repr(avatars)]
+        ) + '\n'
+        return (f"## {mdheader}\n\n/// discord{yamloptsstr}")
 
 
 def formatMessageTime(message: dict, fmt: str) -> str:
@@ -77,6 +91,8 @@ def formatDocuments(json_docs: list[dict]) -> None:
 
     last_channel = None
 
+    printed_header = False
+
     for msg_group_time in time_grouped_messages:
         lines: list[Optional[str]] = []
 
@@ -86,7 +102,10 @@ def formatDocuments(json_docs: list[dict]) -> None:
         this_channel = msg_group_time[0]['channel']
         if len(channels.keys()) > 1 and (this_channel != last_channel):
             if not QUIRK_NO_REPEAT_CHANNEL:
+                if printed_header and not MODE_CUSTOMBLOCKS:
+                    print("///\n")
                 print(discordHeaderBlock(msg_group_time))
+                printed_header = True
                 chanstr = f", {channels[this_channel]['name']}"
         last_channel = this_channel
 
@@ -126,7 +145,15 @@ def formatDocuments(json_docs: list[dict]) -> None:
                 else:
                     line = ''
 
-            print("    " + line)
+            if MODE_CUSTOMBLOCKS:
+                print("    " + line)
+            else:
+                print(line)
+
+    if MODE_CUSTOMBLOCKS:
+        print()
+    else:
+        print("///\n")
 
 
 def messageToLines(message, replied_to_messages={}) -> list[str]:
@@ -182,11 +209,21 @@ def parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
+def file_header() -> str:
+    return """---
+Title: discordlogs
+Status: draft
+Date: 1970-01-01
+Category: todo
+Tags: todo
+---
+"""
 
 if __name__ == '__main__':
     args = parse_args()
 
     documents = []
+    print(file_header())
     for input_path in args.input_files:
         with open(input_path, 'r', encoding='utf-8') as fp:
             documents.append(json.load(fp))

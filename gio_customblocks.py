@@ -38,17 +38,6 @@ def filter_key_prefixes(prefix_blacklist: Sequence[str], obj: dict) -> dict:
 
 # Blocks
 
-@customblock('pre')
-def cb_pre(ctx, *args, **kwargs) -> Fragment:
-    slugargs = ['-'.join(arg.split()) for arg in args]
-    return cbE(
-        "pre.pre-wrap",
-        {'_class': ' '.join(slugargs)},
-        ctx.content,
-        **kwargs
-    )
-
-
 @customblock('aside')
 def cb_aside(ctx, title=None, *args, **kwargs) -> Fragment:
     slugargs = ['-'.join(arg.split()) for arg in args]
@@ -76,7 +65,7 @@ def cb_blockquote(ctx, *args, **kwargs) -> Fragment:
     )
 
 
-@customblock('spoiler')
+@customblock('spoiler2')
 def cb_spoiler(ctx, desc=None, *args, **kwargs) -> Fragment:
     slugargs = ['-'.join(arg.split()) for arg in args]
     return cbE(
@@ -94,98 +83,98 @@ def cb_spoiler(ctx, desc=None, *args, **kwargs) -> Fragment:
     )
 
 
-@customblock('imessage')
-def cb_imessage(ctx, name=None, image=None, *args, **kwargs) -> Fragment:
-    slugargs = ['-'.join(arg.split()) for arg in args]
-    body_etree = cbE(
-        "blockquote",
-        {'class': ' '.join(['imessage', *slugargs])},
-        (
-            cbE(
-                'div',
-                {'class': 'phhead'},
-                (cbE('img', {'src': image}) if image else None),
-                (name if name else None)
-            )
-            if image or name else None
-        ),
-        cbMarkdown(ctx.content, ctx.parser),
-        **kwargs
-    )
+# @customblock('imessage')
+# def cb_imessage(ctx, name=None, image=None, *args, **kwargs) -> Fragment:
+#     slugargs = ['-'.join(arg.split()) for arg in args]
+#     body_etree = cbE(
+#         "blockquote",
+#         {'class': ' '.join(['imessage', *slugargs])},
+#         (
+#             cbE(
+#                 'div',
+#                 {'class': 'phhead'},
+#                 (cbE('img', {'src': image}) if image else None),
+#                 (name if name else None)
+#             )
+#             if image or name else None
+#         ),
+#         cbMarkdown(ctx.content, ctx.parser),
+#         **kwargs
+#     )
 
-    for root in body_etree.findall('ul'):
-        for author_group in root.findall('li'):
-            author = author_group.text
-            if not author: raise ValueError("Couldn't parse author group", author_group)  # noqa: E701
-            author_key = author.lower()
-            author_group.set('data-author', author_key)
-            if author_key not in {'you', 'them'}:
-                author_group.insert(
-                    0,
-                    cbE('span', {'class': 'author'}, author)
-                )
-            author_group.text = ''
+#     for root in body_etree.findall('ul'):
+#         for author_group in root.findall('li'):
+#             author = author_group.text
+#             if not author: raise ValueError("Couldn't parse author group", author_group)  # noqa: E701
+#             author_key = author.lower()
+#             author_group.set('data-author', author_key)
+#             if author_key not in {'you', 'them'}:
+#                 author_group.insert(
+#                     0,
+#                     cbE('span', {'class': 'author'}, author)
+#                 )
+#             author_group.text = ''
 
-    return body_etree
+#     return body_etree
 
 def _cssSlug(string) -> str:
     return '-'.join( string.lower().split(' '))
 
 
-@customblock('discord')
-def cb_discord(ctx, *args, **kwargs) -> Fragment:
-    slugargs = ['-'.join(arg.split()) for arg in args if arg]
-    body_etree: Fragment = cbE(
-        "blockquote",
-        {'class': ' '.join(['discord', *slugargs])},
-        cbMarkdown(ctx.content, ctx.parser),
-        **filter_key_prefixes(['color_', 'avatar_'], kwargs)
-    )
+# @customblock('discord')
+# def cb_discord(ctx, *args, **kwargs) -> Fragment:
+#     slugargs = ['-'.join(arg.split()) for arg in args if arg]
+#     body_etree: Fragment = cbE(
+#         "blockquote",
+#         {'class': ' '.join(['discord', *slugargs])},
+#         cbMarkdown(ctx.content, ctx.parser),
+#         **filter_key_prefixes(['color_', 'avatar_'], kwargs)
+#     )
 
-    avatar_prefix = 'avatar_'
-    root_style = '; '.join([
-        f"--icon-{_cssSlug(k[len(avatar_prefix):])}: url({v})"
-        for (k, v) in kwargs.items()
-        if k.startswith(avatar_prefix)
-    ])
-    if root_style:
-        body_etree.set('style', root_style)
+#     avatar_prefix = 'avatar_'
+#     root_style = '; '.join([
+#         f"--icon-{_cssSlug(k[len(avatar_prefix):])}: url({v})"
+#         for (k, v) in kwargs.items()
+#         if k.startswith(avatar_prefix)
+#     ])
+#     if root_style:
+#         body_etree.set('style', root_style)
 
-    for time_segment in body_etree.findall('ul'):
-        for (i, author_group) in enumerate(time_segment.findall('li')):
-            try:
-                if p := author_group.find('p'):
-                    # If starting a new list
-                    logging.error(xml.etree.ElementTree.tostring(p))
-                    author_group.text = p.text
-                    author_group.remove(p)
-                if not author_group.text:
-                    raise ValueError("Couldn't parse author group", author_group)
-                author_name = author_group.text.split("<")[0].strip()
+#     for time_segment in body_etree.findall('ul'):
+#         for (i, author_group) in enumerate(time_segment.findall('li')):
+#             try:
+#                 if p := author_group.find('p'):
+#                     # If starting a new list
+#                     logging.error(xml.etree.ElementTree.tostring(p))
+#                     author_group.text = p.text
+#                     author_group.remove(p)
+#                 if not author_group.text:
+#                     raise ValueError("Couldn't parse author group", author_group)
+#                 author_name = author_group.text.split("<")[0].strip()
 
-                if author_name == 'SYS':
-                    author_group.set('class', 'sys')
-                    author_group.text = ''
-                else:
-                    author_group.set('data-author', author_name)
+#                 if author_name == 'SYS':
+#                     author_group.set('class', 'sys')
+#                     author_group.text = ''
+#                 else:
+#                     author_group.set('data-author', author_name)
 
-                style_str: str = ""
-                color = kwargs.get(f'color_{author_name}')
-                if color:
-                    style_str += f"--role-color: {color}; "
-                # avatar = kwargs.get(f'avatar_{author_name}')
-                # if avatar:
-                style_str += f"--icon: var(--icon-{_cssSlug(author_name)}, var(--icon-default)); "
-                if style_str:
-                    author_group.set('style', style_str)
-            except Exception:
-                logging.error(
-                    f"Bad discord input in group {i} of "
-                    f"{xml.etree.ElementTree.tostring(author_group)} (body "
-                    f"{xml.etree.ElementTree.tostring(author_group)})", exc_info=True)
-                raise
+#                 style_str: str = ""
+#                 color = kwargs.get(f'color_{author_name}')
+#                 if color:
+#                     style_str += f"--role-color: {color}; "
+#                 # avatar = kwargs.get(f'avatar_{author_name}')
+#                 # if avatar:
+#                 style_str += f"--icon: var(--icon-{_cssSlug(author_name)}, var(--icon-default)); "
+#                 if style_str:
+#                     author_group.set('style', style_str)
+#             except Exception:
+#                 logging.error(
+#                     f"Bad discord input in group {i} of "
+#                     f"{xml.etree.ElementTree.tostring(author_group)} (body "
+#                     f"{xml.etree.ElementTree.tostring(author_group)})", exc_info=True)
+#                 raise
 
-    return body_etree
+#     return body_etree
 
 
 @customblock('askblog')
