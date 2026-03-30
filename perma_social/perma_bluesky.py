@@ -128,7 +128,10 @@ class PermaBluesky(PermaSocial):
         self.bskyEncachenPost(thread_response['thread']['post'])
         self.bskyEncachenPost(thread_response['thread'].get('parent', {}).get('post'))
         for reply in thread_response['thread'].get('replies', []):
-            self.bskyEncachenPost(reply['post'])
+            if reply.get('post'):
+                self.bskyEncachenPost(reply['post'])
+            else:
+                logging.warning("No post", reply)
 
         return thread_response
 
@@ -147,9 +150,12 @@ class PermaBluesky(PermaSocial):
             self.BSKY_CACHE[post_reference] = json_obj
 
             for json_obj_ex in thread_response['thread']['replies']:
-                pr2 = self.bskyPostToRef(json_obj_ex['post'])
-                self.BSKY_CACHE[pr2] = json_obj_ex['post']
-                self.BSKY_CACHE[pr2]['id'] = pr2.post_id
+                if json_obj_ex.get('post'):
+                    pr2 = self.bskyPostToRef(json_obj_ex['post'])
+                    self.BSKY_CACHE[pr2] = json_obj_ex['post']
+                    self.BSKY_CACHE[pr2]['id'] = pr2.post_id
+                else:
+                    logging.warning("No post", json_obj_ex)
 
             return WorkResult(result=json_obj, nontrivial=True)
 
@@ -171,7 +177,10 @@ class PermaBluesky(PermaSocial):
             yield self.bskyPostToRef(parent['post'])
 
         for reply in thread_response['thread'].get('replies', []):
-            yield self.bskyPostToRef(reply['post'])
+            if reply.get('post'):
+                yield self.bskyPostToRef(reply['post'])
+            else:
+                logging.warning("No post", reply)
 
     JSON_GETTERS = [*PermaSocial.JSON_GETTERS, getSkeetJsonApi]
 

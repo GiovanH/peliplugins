@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.WARNING)
 
 class PermaMastodon(PermaSocial):
     NOUN_POST = "toot"
-    LINK_RE = r"(https|http)://(?P<instance>[^/]+)/@(?P<user_id>[^/]+)/(?!statuses/)(?P<post_id>[^ )]+)"
+    LINK_RE = r"(https|http)://(?P<instance>[^/]+)/@(?P<user_id>[^/]+)/(?!statuses/)(posts/)?(?P<post_id>[^ )]+)"
 
     EMBED_TEMPLATE = env.from_string(
         """{{ account.username }}@{{ instance }}: {{ content|summarize_html|e|replace("\n\n", " - ")|replace("\n", " - ") }}]({{ url }}"""  # )

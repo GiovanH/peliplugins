@@ -310,6 +310,8 @@ class PermaTwitter(PermaSocial):
             logging.warning(debug_items)
             raise
 
+        # pprint.pprint(extracted)
+
         json_obj = extracted['legacy']
         json_obj['user'] = {
             '_extractor': 'legacy+core'
@@ -481,7 +483,7 @@ class PermaTwitter(PermaSocial):
         *PermaSocial.JSON_GETTERS,
         # getPostJsonTweepy,
         # timeout_decorator.timeout(10, use_signals=False)(getTweetJsonGalleryDl),
-        getTweetJsonNittr,
+        # getTweetJsonNittr,
         getTweetJsonGalleryDl,
         # getTweetInternetArchive,
     ]

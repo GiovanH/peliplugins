@@ -88,16 +88,17 @@ class PermaSocial:
         return self._api
 
     def login(self):
-        raise NotImplementedError
+        raise NotImplementedError("Override this method", self)
 
     def getRelatedPosts(self, post_json: dict, post_reference: PostReference) -> Iterable[PostReference]:
-        raise NotImplementedError
+        raise NotImplementedError("Override this method", self)
 
     @classmethod
     def getPostFilePath(cls, json_obj: dict, post_reference: PostReference, makedirs=True, media_id=None) -> str:  # noqa: ARG003
         # json_obj is unused
 
-        dest_dir = os.path.join("socialposts", f"{cls.NOUN_POST}s", post_reference.user_id)
+        user_id_safe = post_reference.user_id.replace(":", "_")
+        dest_dir = os.path.join("socialposts", f"{cls.NOUN_POST}s", user_id_safe)
 
         if makedirs:
             os.makedirs(dest_dir, exist_ok=True)
@@ -115,8 +116,8 @@ class PermaSocial:
     def getPostJson(self, post_reference: PostReference, get_media=True, reason="Unknown", _traversed=[]) -> dict:
         # logging.debug(f"Starting lookup of {post_reference} for {reason}")
 
-        if ":" in post_reference.user_id:
-            raise NotImplementedError
+        # if ":" in post_reference.user_id:
+        #     raise NotImplementedError(f"Invalid reference {post_reference}")
 
         last_exception: Exception = NotImplemented
         for getter in self.JSON_GETTERS:
