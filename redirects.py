@@ -3,6 +3,8 @@ import logging
 # from six.moves.urllib.parse import urljoin
 import six
 from pelican import signals
+import functools
+import operator
 # from pelican.utils import pelican_open
 
 if not six.PY3:
@@ -32,7 +34,7 @@ def link_source_files(generator):
     to destinations, as well as adding a source file URL as an attribute.
     """
     # Get all attributes from the generator that are articles or pages
-    documents = sum([
+    documents = functools.reduce(operator.iadd, [
         getattr(generator, attr, None)
         for attr in TYPES_TO_PROCESS
         if getattr(generator, attr, None)
@@ -72,12 +74,6 @@ def link_source_files(generator):
 
             logger.debug('Will write redirect at %s to url %s', write_to, redirect_to)
             source_files.append(out)
-
-
-def _copy_from_to(from_file, to_file):
-    """
-    A very rough and ready copy from / to function.
-    """
 
 
 def write_source_files(*args, **kwargs):

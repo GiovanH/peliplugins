@@ -15,9 +15,16 @@ INCL_BLOCKQUOTES = False
 TextStats = collections.namedtuple("TextStats", ['stcs', 'words', 'syllables'])
 
 # Todo: This needs functionality for filtering out blockquotes.
+# def include_only(tag):
+#     if tag.name == 'blockquote':
+#         return True
+#     if tag.name == 'div' and tag.get('class') == ['footnote']:
+#         return True
+#     return False
 
-only_blockquotes = bs4.SoupStrainer(name='blockquote')
-no_blockquotes = bs4.SoupStrainer(lambda n, a: n != 'blockquote')
+
+# only_blockquotes = bs4.SoupStrainer(include_only)
+# no_blockquotes = bs4.SoupStrainer(lambda t: not include_only(t))
 
 def pelican_init(pelican_object):
     global WPM
@@ -51,6 +58,9 @@ def getRawText(instance):
             # Must not be a root with nested blockquotes inside
             bq_text.append(bq.getText())
             bq.extract()
+    for bq in soup.find_all("div", class_='footnote'):
+        bq_text.append(bq.getText())
+        bq.extract()
 
     return " ".join(bq_text), soup.getText()
 
