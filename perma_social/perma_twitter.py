@@ -36,7 +36,7 @@ def tw_entities(text, id, entities, extended_entities) -> str:
             if e['type'] == "photo":
                 repl = f"""<a href="{e.get('expanded_url') or PermaTwitter.getRealSourceUrl(e)}" target="_blank">
     <img class="img count{media_count}" src="{PermaTwitter.getRealSourceUrl(e)}"
-         """ + """onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;})();"
+         """ + """ onerror="(async () => {this.onerror=null;this.src=`https://web.archive.org/web/0/${this.src}`;})();"
     ></img>
 </a>"""
             elif e['type'] == "video" or e['type'] == "hls":

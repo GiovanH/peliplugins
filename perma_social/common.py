@@ -188,12 +188,36 @@ class PermaSocial:
                 logging.error(f"Media error {post_reference}: {e}")
                 open(media_dest_path, 'wb')  # touch file
 
+    def render(self, href, title='') -> str:
+        post_reference: Optional[PostReference] = None
+        try:
+            matches = re.match(self.LINK_RE, href).groupdict()
+            post_reference = self.PostRef(**matches)  # type: ignore[arg-type]
+            json_obj = self.getPostJson(post_reference, get_media=True, reason=repr(href))
+
+        except Exception:
+            logging.error(f"Can't load {self.NOUN_POST} " + repr(post_reference), exc_info=True)
+            return f"<p>ERROR! Can't load {self.NOUN_POST} <a href='{href}'>'{title}'</a></p>"
+
+        string = f"{post_reference=}"  # For error case only
+        extra_attrs = " ".join([
+            f'data-{k}="{v}"' for k, v in
+            dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(href).query)).items()  # type: ignore[type-var]
+        ])
+        try:
+            return self.POST_HTML_TEMPLATE.render(extra_attrs=extra_attrs, **matches, **json_obj)  # type: ignore[arg-type]
+        except Exception as e:
+            logging.error(string, exc_info=True)
+            raise e
+
+
+
     def embedprocessor(superself, *args, **kwargs) -> markdown.inlinepatterns.LinkInlineProcessor:  # type: ignore # noqa: N805
 
         class EmbedProcessor(markdown.inlinepatterns.LinkInlineProcessor):
             """ Return a link element from the given match. """
 
-            def handleMatch(self, m, data):
+            def handleMatch(self, m, data) -> tuple:
                 title, index, handled = self.getText(data, m.end(0))
                 if not handled:
                     return None, None, None
@@ -204,8 +228,12 @@ class PermaSocial:
 
                 post_reference: Optional[PostReference] = None
                 try:
-                    post_reference = superself.PostRef(**matches)  # type: ignore[arg-type]
-                    json_obj = superself.getPostJson(post_reference, get_media=True, reason=repr(m))
+                    rendered = superself.render(href, title)
+                    return (
+                        self.md.htmlStash.store(rendered),  # noqa: S314
+                        int(m.start(0)),
+                        int(index)  # type: ignore
+                    )
 
                 except Exception:
                     logging.error(f"Can't load {superself.NOUN_POST} " + repr(post_reference), exc_info=True)
@@ -217,23 +245,6 @@ class PermaSocial:
                         int(m.start(0)),
                         int(index)  # type: ignore
                     )
-
-                string = f"{data=}, {post_reference=}"  # For error case only
-                extra_attrs = " ".join([
-                    f'data-{k}="{v}"' for k, v in
-                    dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(href).query)).items()  # type: ignore[type-var]
-                ])
-                try:
-                    string = superself.POST_HTML_TEMPLATE.render(extra_attrs=extra_attrs, **matches, **json_obj)  # type: ignore[arg-type]
-                    # return ET.fromstring(string), m.start(0), m.end(0)
-                    return (
-                        self.md.htmlStash.store(string),  # noqa: S314
-                        int(m.start(0)),
-                        int(index)  # type: ignore
-                    )
-                except Exception as e:
-                    logging.error(string, exc_info=True)
-                    raise e
 
             def getLink(self, data: str, index: int) -> Union[Tuple[str, Mapping[str, str], str, int, bool], Tuple[None, None, None, None, None]]:
                 href, title, index, handled = super().getLink(data, index)

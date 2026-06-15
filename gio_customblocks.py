@@ -38,49 +38,49 @@ def filter_key_prefixes(prefix_blacklist: Sequence[str], obj: dict) -> dict:
 
 # Blocks
 
-@customblock('aside')
-def cb_aside(ctx, title=None, *args, **kwargs) -> Fragment:
-    slugargs = ['-'.join(arg.split()) for arg in args]
-    return cbE(
-        f"aside.cb.{title}",
-        {'_class': ' '.join(slugargs)},
-        cbE(
-            "div", {'class': 'aside-header'},
-            cbE("span", {'class': 'icon'}),
-            cbE("span", {'class': 'type'}),
-        ),
-        cbMarkdown(ctx.content, ctx.parser),
-        **kwargs
-    )
+# @customblock('aside2')
+# def cb_aside(ctx, title=None, *args, **kwargs) -> Fragment:
+#     slugargs = ['-'.join(arg.split()) for arg in args]
+#     return cbE(
+#         f"aside.cb.{title}",
+#         {'_class': ' '.join(slugargs)},
+#         cbE(
+#             "div", {'class': 'aside-header'},
+#             cbE("span", {'class': 'icon'}),
+#             cbE("span", {'class': 'type'}),
+#         ),
+#         cbMarkdown(ctx.content, ctx.parser),
+#         **kwargs
+#     )
 
 
-@customblock('blockquote')
-def cb_blockquote(ctx, *args, **kwargs) -> Fragment:
-    slugargs = ['-'.join(arg.split()) for arg in args]
-    return cbE(
-        "blockquote",
-        {'class': ' '.join(slugargs)},
-        cbMarkdown(ctx.content, ctx.parser),
-        **kwargs
-    )
+# @customblock('blockquote')
+# def cb_blockquote(ctx, *args, **kwargs) -> Fragment:
+#     slugargs = ['-'.join(arg.split()) for arg in args]
+#     return cbE(
+#         "blockquote",
+#         {'class': ' '.join(slugargs)},
+#         cbMarkdown(ctx.content, ctx.parser),
+#         **kwargs
+#     )
 
 
-@customblock('spoiler2')
-def cb_spoiler(ctx, desc=None, *args, **kwargs) -> Fragment:
-    slugargs = ['-'.join(arg.split()) for arg in args]
-    return cbE(
-        "div.spoiler-wrapper", {'_class': ' '.join(slugargs)},
-        cbE("button", {
-            'type': 'button',
-            'class': 'spoiler-button',
-            'onclick': "this.setAttribute('open', !(this.getAttribute('open') == 'true'))"
-        }, desc),
-        cbE(
-            "div.spoiler-content",
-            cbMarkdown(ctx.content, ctx.parser)
-        ),
-        **kwargs
-    )
+# @customblock('spoiler2')
+# def cb_spoiler(ctx, desc=None, *args, **kwargs) -> Fragment:
+#     slugargs = ['-'.join(arg.split()) for arg in args]
+#     return cbE(
+#         "div.spoiler-wrapper", {'_class': ' '.join(slugargs)},
+#         cbE("button", {
+#             'type': 'button',
+#             'class': 'spoiler-button',
+#             'onclick': "this.setAttribute('open', !(this.getAttribute('open') == 'true'))"
+#         }, desc),
+#         cbE(
+#             "div.spoiler-content",
+#             cbMarkdown(ctx.content, ctx.parser)
+#         ),
+#         **kwargs
+#     )
 
 
 # @customblock('imessage')
@@ -176,6 +176,14 @@ def _cssSlug(string) -> str:
 
 #     return body_etree
 
+@customblock('html')
+def cb_html(ctx, name, *args, **kwds):
+    args = [ '-'.join(arg.split()) for arg in args ]
+    return cbE(name,
+        dict(_class=' '.join(args)),
+        cbMarkdown(ctx.content, ctx.parser),
+        **kwds
+    )
 
 @customblock('askblog')
 def cb_askblog(ctx, *args, **kwargs) -> Fragment:

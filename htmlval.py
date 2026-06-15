@@ -4,6 +4,7 @@ import logging
 import bs4
 from pelican import signals
 from pelican.generators import ArticlesGenerator, PagesGenerator, TemplatePagesGenerator
+from urllib.parse import quote
 
 TYPES_TO_PROCESS = [
     "articles", "pages", "drafts",
@@ -30,7 +31,7 @@ def process_content(instance, generator=None):
         url = anchor['href']
 
         if url.startswith("#") and url != "#":
-            if url[1:] not in element_ids:
+            if url[1:] not in element_ids and quote(url[1:]) not in element_ids:
                 issues.append(f"'{anchor}' backlink has no referent {url[1:]!r} in {sorted(element_ids)!r}")
 
     # Hash text isn't respected by first child, so this catches inline links too.
@@ -49,7 +50,7 @@ def process_content(instance, generator=None):
                     # issues.append(f"{instance.summary[:200]} ... {instance.summary[-200:]}")
                 else:
                     issues.append(f"Unsummarized article length is {summary_length}/{SUMMARY_MAX_LENGTH}")
-                    if instance.has_summary:
+                    if hasattr(instance, 'has_summary') and instance.has_summary:
                         issues.append("Article incorrectly has 'has_summary' set to True!")
 
         else:
