@@ -240,10 +240,9 @@ Some functions in this plugin derived from [post_stats](https://github.com/getpe
 
 Anchorlinks is an extremely simple plugin that simply adds the class `.anchorlink` to any anchorlinks (i.e. jumplinks, links to anchors on the page) in the HTML document.
 
-The only configuration is an optional 
-
 Anchorlinks is designed to be used with additional CSS styling to differentiate the anchorlinks from other links.
 
+The only configuration is an optional `ANCHORLINKS_IGNORE` list.
 Anchorlinks will ignore all links with tags in `ANCHORLINKS_IGNORE`, which is `["footnote-ref", "toclink"]` by default.
 
 *You probably don't want this. You probably want the `[href^="#"]` selector instead.*

@@ -6,6 +6,7 @@ import functools
 import typing
 import requests
 import html
+import mimetypes
 import sys
 import re
 import bs4
@@ -102,7 +103,8 @@ def _tw_avatar_src(profile_image_url, screen_name):
                 # Python 3, decode from bytes to string
                 assert isinstance(image_data, bytes)
                 image_data = image_data.decode()
-            data_url = f'data:image/{os.path.splitext(image_id)[1]};base64,' + image_data
+            mime = mimetypes.guess_type(image_id)[0] or 'image/jpeg'
+            data_url = f'data:{mime};base64,' + image_data
         # print(data_url)
         return data_url
         # return '{static}/../../' + image_path  # doesn't attach
@@ -312,27 +314,33 @@ class PermaTwitter(PermaSocial):
 
         # pprint.pprint(extracted)
 
-        json_obj = extracted['legacy']
-        json_obj['user'] = {
-            '_extractor': 'legacy+core'
-        }
-        json_obj['user'].update(extracted['core']['user_results']['result'])
-        json_obj['user'].update(extracted['core']['user_results']['result']['legacy'])
-        json_obj['user'].update(extracted['core']['user_results']['result']['core'])
-        # json_obj['user_obj'] = {'_extractor': '_user_obj', **extractor._user_obj}
-        # json_obj['user'] = {**json_obj['user_obj'], **json_obj['user_legacy']}
+        try:
+            json_obj = extracted
+            json_obj.update(extracted['details'])
 
-        if extracted.get('note_tweet'):
-            json_obj['note_tweet'] = extracted.get('note_tweet')
-            json_obj['full_text_orig'] = json_obj['full_text']
-            json_obj['full_text'] = json_obj['note_tweet']['note_tweet_results']['result']['text']
+            json_obj['user'] = {
+                '_extractor': 'core+details'
+            }
+            json_obj['user'].update(extracted['core']['user_results']['result'])
+            # json_obj['user'].update(extracted['core']['user_results']['result']['legacy'])
+            json_obj['user'].update(extracted['core']['user_results']['result']['core'])
+            # json_obj['user_obj'] = {'_extractor': '_user_obj', **extractor._user_obj}
+            # json_obj['user'] = {**json_obj['user_obj'], **json_obj['user_legacy']}
 
-        json_obj['user']['screen_name'] = json_obj['user'].get('screen_name') or extractor._user_obj['core']['screen_name']
+            if extracted.get('note_tweet'):
+                json_obj['note_tweet'] = extracted.get('note_tweet')
+                json_obj['full_text_orig'] = json_obj['full_text']
+                json_obj['full_text'] = json_obj['note_tweet']['note_tweet_results']['result']['text']
 
-        json_obj['_raw'] = repr(extracted)
-        json_obj['_extractor'] = 'gallerydl'
+            json_obj['user']['screen_name'] = json_obj['user'].get('screen_name') or extractor._user_obj['core']['screen_name']
 
-        return WorkResult(json_obj, nontrivial=True)  # (json_obj_main, json_objs)
+            json_obj['_raw'] = repr(extracted)
+            json_obj['_extractor'] = 'gallerydl'
+
+            return WorkResult(json_obj, nontrivial=True)  # (json_obj_main, json_objs)
+        except KeyError:
+            logging.error(pprint.pformat(extracted))
+            raise
 
     def getTweetJsonNittr(self: typing.Self, post_reference: PostReference, reason="") -> WorkResult:
         if not self.NITTR_HOST:

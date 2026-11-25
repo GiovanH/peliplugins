@@ -36,6 +36,8 @@ def urlretrieve(src: str, dest: str) -> None:
         opener = urllib_request.build_opener()
         opener.addheaders = [('User-agent', 'curl/8.0.1')]
         urllib_request.install_opener(opener)
+        import ssl
+        ssl._create_default_https_context = ssl._create_unverified_context
         urllib_request.urlretrieve(src, dest)
         # resp = requests.get(src, headers={'User-Agent': 'curl/8.0.1'})
 
